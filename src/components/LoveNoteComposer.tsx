@@ -88,9 +88,7 @@ export function LoveNoteComposer({
             Your LoveNote is now part of the Love of Fame.
           </h2>
           <div className="mt-8 rounded-2xl bg-secondary/70 p-6">
-            <p className="font-display text-2xl text-primary">
-              Want to keep this moment forever?
-            </p>
+            <p className="font-display text-2xl text-primary">Want to keep this moment forever?</p>
             <p className="mt-1 text-sm text-muted-foreground">
               Turn this LoveNote into a LoveCoin.
             </p>
@@ -173,8 +171,7 @@ export function LoveNoteComposer({
             <option value="">No LoveCoin</option>
             {myCoins.map((c) => (
               <option key={c.id} value={c.id}>
-                #{String(c.coin_number).padStart(8, "0")} — {c.creator_name} for{" "}
-                {c.recipient_name}
+                #{String(c.coin_number).padStart(8, "0")} — {c.creator_name} for {c.recipient_name}
               </option>
             ))}
           </select>
