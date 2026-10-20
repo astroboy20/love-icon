@@ -73,61 +73,61 @@ This plan implements the full Supabase backend integration for LoveCoin, replaci
     - Actions: `setCurrentUser`, `clearSession`, `markSessionExpired`
     - _Requirements: 6.3, 20.2, 22.8_
 
-- [ ] 4. Create payment utility functions
-  - [ ] 4.1 Create `src/features/payments/utils/kobo.ts`
+- [x] 4. Create payment utility functions
+  - [x] 4.1 Create `src/features/payments/utils/kobo.ts`
     - `nairaToKobo(naira: number): number` — multiply by 100 (integer arithmetic, no floating point)
     - `koboToNairaString(kobo: number): string` — divide by 100, return decimal string (e.g., `koboToNairaString(100000)` → `"1000.00"`)
     - `koboToNaira(kobo: number): number` — divide by 100 as integer
     - _Requirements: 4.1, 11.2_
 
-  - [ ]* 4.2 Write property test for naira-to-kobo conversion
+  - [x] 4.2 Write property test for naira-to-kobo conversion
     - **Property 7: Naira-to-kobo conversion is exact**
     - **Validates: Requirements 4.1, 11.2**
 
-  - [ ] 4.3 Create `src/features/payments/utils/paymentReference.ts`
+  - [x] 4.3 Create `src/features/payments/utils/paymentReference.ts`
     - `generatePaymentReference(userId: string, timestamp: number): string` — format `lovecoin-{userId}-{timestamp}`
     - _Requirements: 4.8, 12.8, 13.1_
 
-  - [ ]* 4.4 Write property test for payment reference uniqueness
+  - [x] 4.4 Write property test for payment reference uniqueness
     - **Property 1: Payment reference uniqueness**
     - **Validates: Requirements 4.8, 12.8, 13.1**
 
-  - [ ] 4.5 Create `src/features/payments/utils/bachsConfig.ts`
+  - [x] 4.5 Create `src/features/payments/utils/bachsConfig.ts`
     - Export Edge Function URL, return URL, cancel URL, Bachs API base URL
     - Read from environment variables (never `VITE_` prefixed for secrets)
     - _Requirements: 4.1, 21.18_
 
-- [ ] 5. Create coin utility functions
-  - [ ] 5.1 Create `src/features/coins/utils/coinValidation.ts`
+- [x] 5. Create coin utility functions
+  - [x] 5.1 Create `src/features/coins/utils/coinValidation.ts`
     - `MIN_SPOTS = 10`, `COIN_PRICE_KOBO = 10000` (₦100 in kobo)
     - `validateMinSpots(count: number): boolean` — returns true if count >= 10
     - `calculateTotalKobo(spotCount: number): number` — `spotCount * COIN_PRICE_KOBO`
     - `isCoinNumberConflictError(error: unknown): boolean` — checks `PostgresError.code === '23505'` on `coin_number`
     - _Requirements: 10.1, 10.5, 11.2, 11.3, 11.4_
 
-  - [ ]* 5.2 Write property test for minimum purchase size
+  - [x] 5.2 Write property test for minimum purchase size
     - **Property 5: Minimum purchase size is enforced**
     - **Validates: Requirements 11.2, 11.3, 11.4**
 
-  - [ ] 5.3 Create `src/features/coins/utils/generateStoragePath.ts`
+  - [x] 5.3 Create `src/features/coins/utils/generateStoragePath.ts`
     - `generateStoragePath(userId: string, filename: string): string` — format `{userId}/{timestamp}-{randomId}.{ext}`
     - _Requirements: 2.5, 3.5, 19.1, 19.2_
 
-  - [ ]* 5.4 Write property test for user-prefixed storage paths
+  - [x] 5.4 Write property test for user-prefixed storage paths
     - **Property 6: Storage paths are user-prefixed**
     - **Validates: Requirements 2.5, 3.5, 19.1, 19.2, 21.13_
 
-- [ ] 6. Checkpoint - Ensure all utility functions and API slices compile
+- [x] 6. Checkpoint - Ensure all utility functions and API slices compile
   - Ensure all tests pass, ask the user if questions arise.
 
-- [ ] 7. Wire Redux Provider in root layout
-  - [ ] 7.1 Replace `QueryClientProvider` + `LoveProvider` with Redux `<StoreProvider>` in `src/routes/__root.tsx`
+- [x] 7. Wire Redux Provider in root layout
+  - [x] 7.1 Replace `QueryClientProvider` + `LoveProvider` with Redux `<StoreProvider>` in `src/routes/__root.tsx`
     - Remove `QueryClientProvider` and `LoveProvider` imports and wrapping
     - Wrap `<Layout>` with `<StoreProvider>` from `src/app/provider.tsx`
     - Keep `<Outlet />` inside `<Layout>`
     - _Requirements: 22.5, 22.11_
 
-  - [ ] 7.2 Initialize auth state in `authSlice` from Supabase session on app load
+  - [x] 7.2 Initialize auth state in `authSlice` from Supabase session on app load
     - Call `supabase.auth.getSession()` and `supabase.auth.onAuthStateChange()` in a root-level hook
     - Dispatch `setCurrentUser` / `clearSession` on auth state changes
     - Handle cross-tab auth sync via Supabase's built-in broadcast

@@ -10,7 +10,7 @@ export const lovable = {
       const { error } = await supabase.auth.signInWithOAuth({
         provider,
         options: {
-          redirectTo: opts?.redirect_uri,
+          ...(opts?.redirect_uri !== undefined && { redirectTo: opts.redirect_uri }),
         },
       });
       if (error) return { error };

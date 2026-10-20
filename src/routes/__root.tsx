@@ -1,4 +1,3 @@
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import {
   Outlet,
   Link,
@@ -12,8 +11,9 @@ import { useEffect, type ReactNode } from "react";
 
 import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
-import { LoveProvider } from "@/lib/store";
+import { StoreProvider } from "@/app/provider";
 import { Layout } from "@/components/Layout";
+import { useAuthInit } from "@/hooks/useAuthInit";
 
 function NotFoundComponent() {
   return (
@@ -75,7 +75,7 @@ function ErrorComponent({ error, reset }: ErrorComponentProps) {
   );
 }
 
-export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()({
+export const Route = createRootRouteWithContext<{}>()({
   head: () => ({
     meta: [
       { charSet: "utf-8" },
@@ -126,16 +126,22 @@ function RootShell({ children }: { children: ReactNode }) {
 }
 
 function RootComponent() {
-  const { queryClient } = Route.useRouteContext();
-
   return (
-    <QueryClientProvider client={queryClient}>
-      <LoveProvider>
-        <Layout>
-          {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
-          <Outlet />
-        </Layout>
-      </LoveProvider>
-    </QueryClientProvider>
+    <StoreProvider>
+      <AuthInitializer />
+      <Layout>
+        {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
+        <Outlet />
+      </Layout>
+    </StoreProvider>
   );
+}
+
+/**
+ * Auth state initializer component.
+ * Must be mounted inside the Redux Provider so it can dispatch actions.
+ */
+function AuthInitializer() {
+  useAuthInit();
+  return null;
 }
