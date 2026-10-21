@@ -1,8 +1,8 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { CoinVisual } from "@/components/CoinVisual";
-import { LoveNoteComposer } from "@/components/LoveNoteComposer";
-import { useLove } from "@/lib/store";
+import { LoveNoteComposer } from "@/features/fame/components/LoveNoteComposer";
+import { useGetCoinByNumberQuery } from "@/features/coins/api/coinsApi";
 import { coinLabel, formatDate } from "@/lib/format";
 
 export const Route = createFileRoute("/coin/$coinNumber")({
@@ -43,9 +43,11 @@ function Hearts() {
 
 function CoinPage() {
   const { coinNumber } = Route.useParams();
-  const { coinByNumber, ready } = useLove();
   const navigate = useNavigate();
-  const coin = coinByNumber(Number(coinNumber));
+  const coinNum = Number(coinNumber);
+
+  const { data: coin, isLoading } = useGetCoinByNumberQuery(coinNum);
+
   const [copied, setCopied] = useState(false);
   const [composer, setComposer] = useState(false);
   const [celebrate, setCelebrate] = useState(true);
@@ -59,12 +61,12 @@ function CoinPage() {
     return (
       <div className="mx-auto max-w-md px-5 py-28 text-center">
         <h1 className="font-display text-4xl text-primary">
-          {ready ? "This LoveCoin is still empty." : "Opening…"}
+          {!isLoading ? "This LoveCoin is still empty." : "Opening…"}
         </h1>
-        {ready ? (
+        {!isLoading ? (
           <>
             <p className="mt-3 text-sm text-muted-foreground">
-              {coinLabel(Number(coinNumber))} hasn't been claimed yet. It could be yours.
+              {coinLabel(coinNum)} hasn't been claimed yet. It could be yours.
             </p>
             <Link to="/explore" className="btn-base btn-primary mt-7">
               Claim a LoveCoin ❤️
@@ -84,7 +86,7 @@ function CoinPage() {
 
       <div className="flex justify-center">
         <CoinVisual
-          style={coin.style}
+          style={coin.style as import("@/lib/types").CoinStyle}
           coinNumber={coin.coin_number}
           creator={coin.creator_name}
           recipient={coin.recipient_name}
@@ -104,7 +106,7 @@ function CoinPage() {
 
       {coin.message ? (
         <p className="font-display mx-auto mt-10 max-w-xl text-3xl leading-snug text-foreground md:text-[2.2rem]">
-          “{coin.message}”
+          "{coin.message}"
         </p>
       ) : null}
 

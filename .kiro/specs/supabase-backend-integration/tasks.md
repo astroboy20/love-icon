@@ -189,7 +189,7 @@ This plan implements the full Supabase backend integration for LoveCoin, replaci
     - Display error message on failure
     - _Requirements: 6.1, 6.2, 6.3, 6.4_
 
-  - [ ] 8.10 Create `src/features/payments/components/PaymentSummary.tsx`
+  - [x] 8.10 Create `src/features/payments/components/PaymentSummary.tsx`
     - Display total amount (spot count × ₦100) and selected spot count
     - _Requirements: 11.4_
 

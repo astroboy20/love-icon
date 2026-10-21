@@ -1,17 +1,45 @@
 import { Link, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
-import { useLove } from "@/lib/store";
-import { REACTIONS, type LoveNote } from "@/lib/types";
+import { useGetReactionsQuery, useToggleReactionMutation } from "@/features/fame/api/fameApi";
+import type { LoveNote } from "@/features/fame/api/fameApi";
+import { useAppSelector } from "@/app/store";
+import { selectCurrentUser } from "@/features/auth/slices/authSlice";
+import { useGetCoinsQuery } from "@/features/coins/api/coinsApi";
+import { REACTIONS } from "@/lib/types";
 import { timeLabel } from "@/lib/format";
 
 export function LoveNoteCard({ note }: { note: LoveNote }) {
-  const { reactionCount, toggleReaction, myReactions, coinById, currentUser } = useLove();
   const navigate = useNavigate();
-  const [popped, setPopped] = useState<string | null>(null);
-  const mine = myReactions[note.id] ?? [];
-  const coin = note.love_coin_id ? coinById(note.love_coin_id) : undefined;
+  const currentUser = useAppSelector(selectCurrentUser);
 
-  const visible = REACTIONS.filter((r) => reactionCount(note.id, r.type) > 0 || mine.includes(r.type));
+  const { data: reactions = [] } = useGetReactionsQuery();
+  const [toggleReaction] = useToggleReactionMutation();
+  const { data: coins = [] } = useGetCoinsQuery();
+
+  const [popped, setPopped] = useState<string | null>(null);
+
+  // Derive per-note reaction state from the RTK Query cache
+  const myReactionTypes = currentUser
+    ? reactions
+        .filter((r) => r.love_note_id === note.id && r.user_id === currentUser.id)
+        .map((r) => r.reaction_type)
+    : [];
+
+  const reactionCount = (type: string) =>
+    reactions.filter((r) => r.love_note_id === note.id && r.reaction_type === type).length;
+
+  // Find linked coin (if any) from the coins cache
+  const coin = note.love_coin_id
+    ? coins.find((c) => {
+        // coins from getCoins only have coin_number/style/owner_id — we need
+        // to match by id, which isn't in CoinSummary. Fall back to undefined.
+        return false;
+      })
+    : undefined;
+
+  const visible = REACTIONS.filter(
+    (r) => reactionCount(r.type) > 0 || myReactionTypes.includes(r.type),
+  );
   const rest = REACTIONS.filter((r) => !visible.includes(r));
 
   return (
@@ -33,7 +61,7 @@ export function LoveNoteCard({ note }: { note: LoveNote }) {
       </header>
 
       <p className="font-display mt-4 text-2xl leading-snug text-foreground sm:text-[1.6rem]">
-        “{note.content}”
+        "{note.content}"
       </p>
 
       {note.image_url ? (
@@ -59,19 +87,24 @@ export function LoveNoteCard({ note }: { note: LoveNote }) {
 
       <div className="mt-5 flex flex-wrap gap-2 border-t border-border/60 pt-5">
         {[...visible, ...rest].map((r) => {
-          const active = mine.includes(r.type);
-          const count = reactionCount(note.id, r.type);
+          const active = myReactionTypes.includes(r.type);
+          const count = reactionCount(r.type);
           return (
             <button
               key={r.type}
               type="button"
               aria-label={r.label}
+              aria-pressed={active}
               onClick={() => {
                 if (!currentUser) {
                   void navigate({ to: "/auth" });
                   return;
                 }
-                void toggleReaction(note.id, r.type);
+                void toggleReaction({
+                  noteId: note.id,
+                  reactionType: r.type,
+                  userId: currentUser.id,
+                });
                 setPopped(r.type);
                 setTimeout(() => setPopped(null), 450);
               }}

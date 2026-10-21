@@ -1,7 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { buildHeart } from "@/lib/heart";
 import type { CoinStyle } from "@/lib/types";
-import { useLove } from "@/lib/store";
+import { useGetCoinsQuery } from "@/features/coins/api/coinsApi";
+import { useAppDispatch } from "@/app/store";
+import { toggleCoinSelection, openClaimFlow } from "@/features/coins/slices/coinsSlice";
 
 const CLAIMED_FILL: Record<CoinStyle, string> = {
   classic: "linear-gradient(140deg, oklch(0.5 0.13 20), oklch(0.3 0.1 15))",
@@ -12,16 +14,17 @@ const CLAIMED_FILL: Record<CoinStyle, string> = {
 };
 
 interface Props {
-  onSelect: (coinNumber: number) => void;
+  onSelect?: (coinNumber: number) => void;
   compact?: boolean;
 }
 
 export function HeartGrid({ onSelect, compact = false }: Props) {
-  const { coins } = useLove();
+  const dispatch = useAppDispatch();
+  const { data: coins = [] } = useGetCoinsQuery();
   const cells = useMemo(() => buildHeart(compact ? 38 : 48), [compact]);
   const claimedMap = useMemo(() => {
     const m = new Map<number, CoinStyle>();
-    coins.forEach((c) => m.set(c.coin_number, c.style));
+    coins.forEach((c) => m.set(c.coin_number, c.style as CoinStyle));
     return m;
   }, [coins]);
 
@@ -73,7 +76,11 @@ export function HeartGrid({ onSelect, compact = false }: Props) {
           <button
             key={cell.index}
             type="button"
-            onClick={() => onSelect(cell.coin_number)}
+            onClick={() => {
+              dispatch(toggleCoinSelection(cell.coin_number));
+              dispatch(openClaimFlow());
+              onSelect?.(cell.coin_number);
+            }}
             title={
               claimed
                 ? `LoveCoin #${String(cell.coin_number).padStart(8, "0")} — claimed`

@@ -1,6 +1,10 @@
 import { Link, useNavigate } from "@tanstack/react-router";
 import type { ReactNode } from "react";
-import { useLove } from "@/lib/store";
+import { useAppSelector } from "@/app/store";
+import { selectCurrentUser } from "@/features/auth/slices/authSlice";
+import { useSignOutMutation } from "@/features/auth/api/authApi";
+import { clearSession } from "@/features/auth/slices/authSlice";
+import { useAppDispatch } from "@/app/store";
 
 const NAV = [
   { to: "/explore", label: "Explore" },
@@ -16,11 +20,14 @@ const MOBILE_NAV = [
 ] as const;
 
 export function Layout({ children }: { children: ReactNode }) {
-  const { currentUser, signOut } = useLove();
+  const currentUser = useAppSelector(selectCurrentUser);
+  const dispatch = useAppDispatch();
+  const [signOut] = useSignOutMutation();
   const navigate = useNavigate();
 
   const handleSignOut = async () => {
     await signOut();
+    dispatch(clearSession());
     void navigate({ to: "/", replace: true });
   };
 
@@ -52,7 +59,7 @@ export function Layout({ children }: { children: ReactNode }) {
                   to="/my-lovecoins"
                   className="hidden text-sm font-medium text-muted-foreground transition-colors hover:text-primary md:block"
                 >
-                  {currentUser.display_name}
+                  {currentUser.displayName}
                 </Link>
                 <button
                   type="button"

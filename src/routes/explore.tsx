@@ -1,8 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useState } from "react";
 import { HeartGrid } from "@/components/HeartGrid";
-import { ClaimFlow } from "@/components/ClaimFlow";
-import { useLove } from "@/lib/store";
+import { ClaimFlow } from "@/features/coins/components/ClaimFlow";
+import { useGetCoinsQuery } from "@/features/coins/api/coinsApi";
 import { formatNumber } from "@/lib/format";
 import { TOTAL_COINS } from "@/lib/types";
 
@@ -23,8 +22,8 @@ export const Route = createFileRoute("/explore")({
 });
 
 function Explore() {
-  const { claimedCount } = useLove();
-  const [selected, setSelected] = useState<number | null>(null);
+  const { data: coins = [] } = useGetCoinsQuery();
+  const claimedCount = coins.length;
 
   return (
     <div className="mx-auto max-w-5xl px-4 py-14 md:px-8 md:py-20">
@@ -42,7 +41,7 @@ function Explore() {
       </div>
 
       <div className="mt-12">
-        <HeartGrid onSelect={setSelected} />
+        <HeartGrid />
       </div>
 
       <div className="mt-10 text-center">
@@ -54,7 +53,7 @@ function Explore() {
         </p>
       </div>
 
-      <ClaimFlow coinNumber={selected} open={selected !== null} onClose={() => setSelected(null)} />
+      <ClaimFlow />
     </div>
   );
 }

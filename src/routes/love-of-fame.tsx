@@ -1,10 +1,11 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { LoveNoteCard } from "@/components/LoveNoteCard";
-import { LoveNoteComposer } from "@/components/LoveNoteComposer";
-import { useLove } from "@/lib/store";
+import { LoveNoteComposer } from "@/features/fame/components/LoveNoteComposer";
+import { useGetNotesQuery } from "@/features/fame/api/fameApi";
+import type { LoveNote } from "@/features/fame/api/fameApi";
 import { dayGroupLabel } from "@/lib/format";
-import type { LoveNote, LoveType } from "@/lib/types";
+import type { LoveType } from "@/lib/types";
 
 const TITLE = "Love of Fame — Where love is shared";
 const DESC =
@@ -23,7 +24,7 @@ export const Route = createFileRoute("/love-of-fame")({
 });
 
 function LoveOfFame() {
-  const { notes } = useLove();
+  const { data: notes = [] } = useGetNotesQuery();
   const [composer, setComposer] = useState<LoveType | null>(null);
 
   const groups = useMemo(() => {

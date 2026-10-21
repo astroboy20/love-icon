@@ -1,10 +1,17 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { CoinVisual } from "@/components/CoinVisual";
-import { useLove } from "@/lib/store";
+import { useGetMyCoinsQuery, useGetReceivedCoinsQuery } from "@/features/coins/api/coinsApi";
+import { useGetNotesQuery } from "@/features/fame/api/fameApi";
+import { useAppSelector } from "@/app/store";
+import { selectCurrentUser } from "@/features/auth/slices/authSlice";
+import { ProfileEditor } from "@/features/auth/components/ProfileEditor";
+import { ReceivedCoinsSection } from "@/features/coins/components/ReceivedCoinsSection";
 import { formatDate } from "@/lib/format";
+import type { ReactNode } from "react";
 
 const TITLE = "My LoveCoins — your kept moments";
-const DESC = "The LoveCoins you've created, the ones you've received, and the LoveNotes you've shared.";
+const DESC =
+  "The LoveCoins you've created, the ones you've received, and the LoveNotes you've shared.";
 
 export const Route = createFileRoute("/my-lovecoins")({
   head: () => ({
@@ -19,15 +26,12 @@ export const Route = createFileRoute("/my-lovecoins")({
 });
 
 function MyLoveCoins() {
-  const { coins, notes, currentUser } = useLove();
-  const myId = currentUser?.id ?? null;
-  const created = myId ? coins.filter((c) => c.owner_id === myId) : [];
-  const received = myId
-    ? coins.filter((c) => c.owner_id !== myId && c.recipient_name.toLowerCase() === "you")
-    : [];
-  const mine = myId ? notes.filter((n) => n.user_id === myId) : [];
+  const currentUser = useAppSelector(selectCurrentUser);
+  const { data: myCoins = [] } = useGetMyCoinsQuery(undefined, { skip: !currentUser });
+  const { data: notes = [] } = useGetNotesQuery(undefined, { skip: !currentUser });
+  const mine = currentUser ? notes.filter((n) => n.user_id === currentUser.id) : [];
 
-  if (!myId) {
+  if (!currentUser) {
     return (
       <div className="mx-auto max-w-xl px-5 py-24 text-center md:py-32">
         <h1 className="font-display text-5xl text-primary">My LoveCoins</h1>
@@ -48,8 +52,13 @@ function MyLoveCoins() {
         Everything you've kept and everything you've shared.
       </p>
 
+      {/* Profile editor */}
+      <div className="mt-8">
+        <ProfileEditor />
+      </div>
+
       <Section title="Coins I've created" empty="You haven't kept a moment yet.">
-        {created.map((c) => (
+        {myCoins.map((c) => (
           <Link
             key={c.id}
             to="/coin/$coinNumber"
@@ -57,7 +66,7 @@ function MyLoveCoins() {
             className="flex flex-col items-center gap-3 rounded-[1.5rem] p-4 text-center transition-transform hover:-translate-y-1"
           >
             <CoinVisual
-              style={c.style}
+              style={c.style as import("@/lib/types").CoinStyle}
               coinNumber={c.coin_number}
               creator={c.creator_name}
               recipient={c.recipient_name}
@@ -69,25 +78,8 @@ function MyLoveCoins() {
         ))}
       </Section>
 
-      <Section title="Coins I've received" empty="Nothing here yet — love arrives when it arrives.">
-        {received.map((c) => (
-          <Link
-            key={c.id}
-            to="/coin/$coinNumber"
-            params={{ coinNumber: String(c.coin_number) }}
-            className="flex flex-col items-center gap-3 rounded-[1.5rem] p-4 text-center"
-          >
-            <CoinVisual
-              style={c.style}
-              coinNumber={c.coin_number}
-              creator={c.creator_name}
-              recipient={c.recipient_name}
-              imageUrl={c.image_url}
-              size={140}
-            />
-          </Link>
-        ))}
-      </Section>
+      {/* Received coins uses the dedicated RTK Query component */}
+      <ReceivedCoinsSection />
 
       <section className="mt-16">
         <h2 className="font-display text-3xl text-primary">LoveNotes I've shared</h2>
@@ -109,7 +101,7 @@ function MyLoveCoins() {
                 <span className="text-[0.62rem] tracking-[0.2em] text-muted-foreground uppercase">
                   {n.love_type === "gave" ? "I gave love" : "I received love"} · {n.category}
                 </span>
-                <p className="font-display mt-2 text-xl">“{n.content}”</p>
+                <p className="font-display mt-2 text-xl">"{n.content}"</p>
               </li>
             ))}
           </ul>
@@ -133,7 +125,7 @@ function Section({
 }: {
   title: string;
   empty: string;
-  children: React.ReactNode[];
+  children: ReactNode[];
 }) {
   return (
     <section className="mt-14">

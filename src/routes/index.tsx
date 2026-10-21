@@ -1,9 +1,9 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useState } from "react";
+import { useGetCoinsQuery } from "@/features/coins/api/coinsApi";
+import { useGetNotesQuery } from "@/features/fame/api/fameApi";
+import { ClaimFlow } from "@/features/coins/components/ClaimFlow";
 import { HeartGrid } from "@/components/HeartGrid";
-import { ClaimFlow } from "@/components/ClaimFlow";
 import { CoinVisual } from "@/components/CoinVisual";
-import { useLove } from "@/lib/store";
 import { formatNumber } from "@/lib/format";
 import { TOTAL_COINS } from "@/lib/types";
 
@@ -24,10 +24,11 @@ export const Route = createFileRoute("/")({
 });
 
 function Home() {
-  const { claimedCount, coins, notes } = useLove();
-  const [selected, setSelected] = useState<number | null>(null);
+  const { data: coins = [] } = useGetCoinsQuery();
+  const { data: notes = [] } = useGetNotesQuery();
   const navigate = useNavigate();
   const featured = coins.slice(0, 3);
+  const claimedCount = coins.length;
 
   return (
     <>
@@ -65,7 +66,7 @@ function Home() {
       </section>
 
       <section className="px-4 pb-6 md:px-8">
-        <HeartGrid onSelect={setSelected} />
+        <HeartGrid />
         <div className="mx-auto mt-8 max-w-md text-center">
           <p className="font-display text-3xl text-primary">
             {formatNumber(claimedCount)} LoveCoins claimed
@@ -92,7 +93,7 @@ function Home() {
         <div className="grid gap-8 sm:grid-cols-3">
           {featured.map((coin) => (
             <button
-              key={coin.id}
+              key={coin.coin_number}
               onClick={() =>
                 navigate({
                   to: "/coin/$coinNumber",
@@ -102,16 +103,13 @@ function Home() {
               className="group flex flex-col items-center gap-4 rounded-[1.75rem] p-6 text-center transition-transform hover:-translate-y-1"
             >
               <CoinVisual
-                style={coin.style}
+                style={coin.style as import("@/lib/types").CoinStyle}
                 coinNumber={coin.coin_number}
-                creator={coin.creator_name}
-                recipient={coin.recipient_name}
-                imageUrl={coin.image_url}
+                creator=""
+                recipient=""
+                imageUrl={null}
                 size={168}
               />
-              <p className="max-w-[24ch] text-sm leading-relaxed text-muted-foreground">
-                “{coin.message}”
-              </p>
             </button>
           ))}
         </div>
@@ -130,7 +128,7 @@ function Home() {
         </div>
       </section>
 
-      <ClaimFlow coinNumber={selected} open={selected !== null} onClose={() => setSelected(null)} />
+      <ClaimFlow />
     </>
   );
 }

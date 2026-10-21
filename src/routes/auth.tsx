@@ -2,7 +2,8 @@ import { createFileRoute, useNavigate, useRouterState } from "@tanstack/react-ro
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { lovable } from "@/integrations/lovable/index";
-import { useLove } from "@/lib/store";
+import { useAppSelector } from "@/app/store";
+import { selectCurrentUser } from "@/features/auth/slices/authSlice";
 
 const TITLE = "Sign in — LoveCoin";
 const DESC =
@@ -21,7 +22,7 @@ export const Route = createFileRoute("/auth")({
 });
 
 function AuthPage() {
-  const { currentUser } = useLove();
+  const currentUser = useAppSelector(selectCurrentUser);
   const navigate = useNavigate();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
 
