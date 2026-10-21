@@ -133,8 +133,8 @@ This plan implements the full Supabase backend integration for LoveCoin, replaci
     - Handle cross-tab auth sync via Supabase's built-in broadcast
     - _Requirements: 20.1, 20.2, 20.3, 20.4, 20.5_
 
-- [ ] 8. Migrate components to RTK Query (one at a time)
-  - [ ] 8.1 Refactor `ClaimFlow` to `src/features/coins/components/ClaimFlow.tsx`
+- [-] 8. Migrate components to RTK Query (one at a time)
+  - [x] 8.1 Refactor `ClaimFlow` to `src/features/coins/components/ClaimFlow.tsx`
     - Replace `useLove()` with `useAppSelector` + `coinsApi` hooks + `coinsSlice` actions
     - Support multi-spot selection (10+ spots minimum) with per-spot personalization
     - Replace `chargeCard` mock with `paymentsApi.createPurchaseOrder` + `paymentsApi.createBachsCheckout`
@@ -144,45 +144,45 @@ This plan implements the full Supabase backend integration for LoveCoin, replaci
     - Show "confirming your payment" state after Bachs redirect, poll `paymentsApi.getOrderStatus`
     - _Requirements: 2.1, 2.2, 2.3, 4.3, 4.4, 4.5, 4.6, 4.8, 10.1, 10.2, 10.3, 10.4, 10.5, 11.1, 11.2, 11.3, 11.4, 11.5, 11.6, 22.7, 22.11_
 
-  - [ ] 8.2 Create `src/features/coins/components/CoinPhotoUploader.tsx`
+  - [x] 8.2 Create `src/features/coins/components/CoinPhotoUploader.tsx`
     - File input accepting `image/jpeg, image/png, image/webp, image/gif`
     - Client-side validation: max 5MB, MIME type check
     - Calls `coinsApi.uploadCoinPhoto` mutation, shows progress/error/preview
     - Returns the Storage public URL to parent form
     - _Requirements: 1.4, 1.5, 2.1, 2.2, 2.3, 2.4_
 
-  - [ ] 8.3 Create `src/features/coins/components/CoinPersonalizationForm.tsx`
+  - [x] 8.3 Create `src/features/coins/components/CoinPersonalizationForm.tsx`
     - Extract personalization fields (name, message, photo, style) into a reusable form component
     - Support applying personalization to a single spot or to all selected spots
     - _Requirements: 11.5_
 
-  - [ ] 8.4 Create `src/features/coins/components/ReceivedCoinsSection.tsx`
+  - [x] 8.4 Create `src/features/coins/components/ReceivedCoinsSection.tsx`
     - Query `coinsApi.getReceivedCoins`, display coins where current user is recipient but not owner
     - Display empty state when no received coins exist
     - Exclude coins created by the current user
     - _Requirements: 15.1, 15.2, 15.3, 15.4, 15.5_
 
-  - [ ] 8.5 Create `src/features/coins/hooks/useCoinSelection.ts`
+  - [x] 8.5 Create `src/features/coins/hooks/useCoinSelection.ts`
     - Hook wrapping `coinsSlice` selection state and actions
     - Provides `selectedCoinNumbers`, `toggleCoinSelection`, `clearSelection`, `isMinMet`
     - _Requirements: 11.1, 11.6, 22.8_
 
-  - [ ] 8.6 Refactor `LoveNoteComposer` to `src/features/fame/components/LoveNoteComposer.tsx`
+  - [x] 8.6 Refactor `LoveNoteComposer` to `src/features/fame/components/LoveNoteComposer.tsx`
     - Replace `useLove().publishNote` with `fameApi.publishNote` mutation
     - Upload photos via `fameApi.uploadNotePhoto` before publishing
     - Use RTK Query `isLoading`/`isError` states for UI feedback
     - _Requirements: 3.1, 3.2, 3.3, 3.4, 3.5, 18.2, 22.7, 22.11_
 
-  - [ ] 8.7 Create `src/features/fame/components/NotePhotoUploader.tsx`
+  - [x] 8.7 Create `src/features/fame/components/NotePhotoUploader.tsx`
     - Same pattern as `CoinPhotoUploader`, uploads to `note-photos` bucket via `fameApi.uploadNotePhoto`
     - _Requirements: 1.4, 1.5, 3.1, 3.2, 3.3_
 
-  - [ ] 8.8 Create `src/features/fame/components/ReactionButton.tsx`
+  - [x] 8.8 Create `src/features/fame/components/ReactionButton.tsx`
     - Use `fameApi.toggleReaction` mutation, show optimistic update
     - Use `fameApi.getReactions` query for counts
     - _Requirements: 22.7, 22.11_
 
-  - [ ] 8.9 Create `src/features/auth/components/ProfileEditor.tsx`
+  - [x] 8.9 Create `src/features/auth/components/ProfileEditor.tsx`
     - Profile editing interface accessible from My LoveCoins page
     - Calls `authApi.updateDisplayName` mutation
     - Updates `authSlice.currentUser.display_name` on success without page reload
