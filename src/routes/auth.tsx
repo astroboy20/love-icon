@@ -1,3 +1,21 @@
+/**
+ * Authentication route (/auth)
+ *
+ * Handles:
+ *   - Email/password sign-in and sign-up
+ *   - Google OAuth sign-in (with post-auth redirect back to the originating page)
+ *   - OAuth redirect landing: parse the session from the URL hash/fragment so
+ *     Supabase can hydrate the session (Supabase JS does this automatically when
+ *     `detectSessionInUrl` is true, which is the default). The `onAuthStateChange`
+ *     listener in `useAuthInit` fires once the session is parsed, dispatching
+ *     `setCurrentUser`, which triggers the navigate-away effect below.
+ *   - OAuth error parameters surfaced in URL query params (e.g. "access_denied")
+ *   - Post-auth navigation: redirect to `?redirectTo=` if present, otherwise
+ *     to /my-lovecoins (Requirements 14.4, 14.5)
+ *   - Session expiry message when landing with `?reason=expired` (Req 18.5, 21.20)
+ *
+ * Requirements: 14.1, 14.2, 14.3, 14.4, 14.5, 18.5, 20.4, 21.20
+ */
 import { createFileRoute, useNavigate, useSearch } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import {
@@ -7,15 +25,23 @@ import {
 } from "@/features/auth/api/authApi";
 import { useAppSelector } from "@/app/store";
 import { selectCurrentUser } from "@/features/auth/slices/authSlice";
+import { supabase } from "@/integrations/supabase/client";
 import { z } from "zod";
 
 const TITLE = "Sign in — LoveCoin";
 const DESC =
   "Sign in to keep your LoveCoins, LoveNotes and reactions safe on every device you use.";
 
-// Search params: optional `redirectTo` for post-auth redirect
+// ---------------------------------------------------------------------------
+// Route search-param schema
+// ---------------------------------------------------------------------------
+// `redirectTo`        — page to navigate to after successful auth
+// `reason`            — "expired" when arriving from the 401 interceptor
+// `error`             — OAuth error code (e.g. "access_denied")
+// `error_description` — human-readable OAuth error detail
 const searchSchema = z.object({
   redirectTo: z.string().optional(),
+  reason: z.string().optional(),
   error: z.string().optional(),
   error_description: z.string().optional(),
 });
@@ -37,10 +63,12 @@ function AuthPage() {
   const currentUser = useAppSelector(selectCurrentUser);
   const navigate = useNavigate();
 
-  // Read search params via TanStack Router's typed useSearch
+  // Read typed search params
   const search = useSearch({ from: "/auth" });
   const redirectTo = search.redirectTo;
-  // OAuth error passed back in URL query params (e.g. provider denied access)
+  const reason = search.reason;
+
+  // OAuth errors surfaced in URL query params (provider denied access, etc.)
   const oauthError = search.error_description ?? search.error ?? null;
 
   const [mode, setMode] = useState<"signin" | "signup">("signin");
@@ -57,13 +85,48 @@ function AuthPage() {
 
   const busy = isGoogleLoading || isEmailSignInLoading || isSignUpLoading;
 
-  // When auth state is populated (sign-in succeeded), navigate away.
-  // Priority: redirectTo param → /my-lovecoins
+  // ---------------------------------------------------------------------------
+  // OAuth redirect landing — parse the session from the URL hash.
+  //
+  // When Supabase redirects back from Google OAuth, the access token is
+  // embedded in the URL fragment (#access_token=...&refresh_token=...).
+  // Supabase JS automatically detects and exchanges the token when
+  // `detectSessionInUrl` is true (the default), but we call
+  // `getSessionFromUrl` explicitly here to:
+  //   1. Trigger the exchange immediately on mount rather than waiting for the
+  //      next auth state change listener tick.
+  //   2. Surface any URL-level errors (e.g. missing token) as a user-visible
+  //      message (Requirement 14.3).
+  //
+  // The resulting session is picked up by `onAuthStateChange` in `useAuthInit`,
+  // which dispatches `setCurrentUser`, which triggers the navigate-away effect.
+  // ---------------------------------------------------------------------------
+  useEffect(() => {
+    // Only attempt to parse the URL hash when the fragment contains an
+    // access_token — avoids unnecessary calls on plain /auth page loads.
+    if (typeof window !== "undefined" && window.location.hash.includes("access_token")) {
+      supabase.auth.getSession().catch(() => {
+        // If the token in the hash is malformed or already consumed, surface
+        // a generic error — the user can just sign in again.
+        setError("We couldn't complete your sign-in. Please try again.");
+      });
+    }
+  }, []);
+
+  // ---------------------------------------------------------------------------
+  // Post-auth navigation (Requirements 14.4, 14.5)
+  //
+  // When `currentUser` becomes non-null (set by `useAuthInit` via
+  // `setCurrentUser` on the `onAuthStateChange` event), navigate away from the
+  // auth page:
+  //   - To `redirectTo` if that param is present (Req 14.4)
+  //   - Otherwise to /my-lovecoins (Req 14.5)
+  // ---------------------------------------------------------------------------
   useEffect(() => {
     if (currentUser) {
       if (redirectTo) {
-        // Use window.location for arbitrary redirectTo paths to avoid TS
-        // route-type constraints on navigate({ to }).
+        // `window.location.replace` avoids TS route-type constraints and
+        // supports arbitrary paths including /explore, /coin/:n, etc.
         window.location.replace(redirectTo);
       } else {
         void navigate({ to: "/my-lovecoins", replace: true });
@@ -71,13 +134,28 @@ function AuthPage() {
     }
   }, [currentUser, navigate, redirectTo]);
 
-  // Show OAuth error surfaced in URL params (e.g. "access_denied")
+  // ---------------------------------------------------------------------------
+  // OAuth error params (Requirement 14.3)
+  // ---------------------------------------------------------------------------
   useEffect(() => {
     if (oauthError) {
       setError(decodeURIComponent(oauthError));
     }
   }, [oauthError]);
 
+  // ---------------------------------------------------------------------------
+  // Session expiry notice (Requirements 18.5, 20.4, 21.20)
+  // Arriving with ?reason=expired means the 401 interceptor forced logout.
+  // ---------------------------------------------------------------------------
+  useEffect(() => {
+    if (reason === "expired") {
+      setError("Your session has expired. Please sign in again.");
+    }
+  }, [reason]);
+
+  // ---------------------------------------------------------------------------
+  // Form submission (email sign-in / sign-up)
+  // ---------------------------------------------------------------------------
   const handleSubmit = async (e: React.SyntheticEvent<HTMLFormElement>) => {
     e.preventDefault();
     setError(null);
@@ -111,20 +189,30 @@ function AuthPage() {
       const err = result.error as { message?: string } | undefined;
       setError(err?.message ?? "Sign in failed. Please check your email and password.");
     }
-    // On success, the useAuthInit hook picks up the session change and
-    // dispatches setCurrentUser, which triggers the useEffect above to navigate.
+    // On success, the `useAuthInit` hook picks up the session change and
+    // dispatches `setCurrentUser`, which triggers the navigate-away effect.
   };
 
+  // ---------------------------------------------------------------------------
+  // Google OAuth sign-in (Requirements 14.1, 14.2)
+  //
+  // Build the OAuth `redirectTo` so that after Google authenticates the user,
+  // Supabase redirects back to `/auth` (this page) with the session hash and,
+  // optionally, the `redirectTo` query param preserved so the navigate-away
+  // effect above can forward the user to the right page.
+  // ---------------------------------------------------------------------------
   const handleGoogleSignIn = async () => {
     setError(null);
 
-    // Build the redirect URL so Supabase returns the user to this page
-    // (which then navigates to redirectTo or /my-lovecoins via the useEffect).
-    const redirectUri = `${window.location.origin}/auth${
-      redirectTo ? `?redirectTo=${encodeURIComponent(redirectTo)}` : ""
-    }`;
+    // The OAuth callback must land on /auth so this component can parse the
+    // session from the URL hash. Pass the original `redirectTo` through as a
+    // query param so we can forward it after the session is established.
+    const callbackUrl = new URL(`${window.location.origin}/auth`);
+    if (redirectTo) {
+      callbackUrl.searchParams.set("redirectTo", redirectTo);
+    }
 
-    const result = await signInWithGoogle({ redirectTo: redirectUri });
+    const result = await signInWithGoogle({ redirectTo: callbackUrl.toString() });
 
     if ("error" in result) {
       setError("We couldn't reach Google just then. Please try again.");

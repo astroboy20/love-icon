@@ -130,6 +130,45 @@ export type Database = {
         }
         Relationships: []
       }
+      purchase_orders: {
+        Row: {
+          id: string
+          user_id: string
+          payment_reference: string
+          coin_numbers: number[]
+          total_amount_kobo: number
+          status: 'pending' | 'succeeded' | 'failed' | 'cancelled'
+          bachs_checkout_id: string | null
+          bachs_charge_id: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          payment_reference: string
+          coin_numbers: number[]
+          total_amount_kobo: number
+          status?: string
+          bachs_checkout_id?: string | null
+          bachs_charge_id?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          payment_reference?: string
+          coin_numbers?: number[]
+          total_amount_kobo?: number
+          status?: string
+          bachs_checkout_id?: string | null
+          bachs_charge_id?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       reactions: {
         Row: {
           created_at: string

@@ -37,11 +37,13 @@ interface CurrentUser {
 interface AuthUIState {
   currentUser: CurrentUser | null;
   sessionExpired: boolean;
+  realtimeUnavailable: boolean;
 }
 
 const initialState: AuthUIState = {
   currentUser: null,
   sessionExpired: false,
+  realtimeUnavailable: false,
 };
 
 // ---------------------------------------------------------------------------
@@ -83,6 +85,24 @@ export const authSlice = createSlice({
       state.sessionExpired = true;
       state.currentUser = null;
     },
+
+    /**
+     * Flag that the Supabase real-time connection is unavailable after
+     * exceeding the maximum reconnection attempts. Components can use this
+     * to show a "Live updates unavailable — refresh to see latest" indicator.
+     * Requirement: 18.3, 18.4
+     */
+    setRealtimeUnavailable: (state) => {
+      state.realtimeUnavailable = true;
+    },
+
+    /**
+     * Clear the realtimeUnavailable flag (e.g. after a manual page refresh
+     * or when a new session is established and channels are re-subscribed).
+     */
+    clearRealtimeUnavailable: (state) => {
+      state.realtimeUnavailable = false;
+    },
   },
 });
 
@@ -90,7 +110,7 @@ export const authSlice = createSlice({
 // Actions
 // ---------------------------------------------------------------------------
 
-export const { setCurrentUser, clearSession, markSessionExpired } = authSlice.actions;
+export const { setCurrentUser, clearSession, markSessionExpired, setRealtimeUnavailable, clearRealtimeUnavailable } = authSlice.actions;
 
 // ---------------------------------------------------------------------------
 // Selectors
@@ -99,6 +119,7 @@ export const { setCurrentUser, clearSession, markSessionExpired } = authSlice.ac
 export const selectCurrentUser = (state: RootState) => state.auth.currentUser;
 export const selectIsAuthenticated = (state: RootState) => state.auth.currentUser !== null;
 export const selectSessionExpired = (state: RootState) => state.auth.sessionExpired;
+export const selectRealtimeUnavailable = (state: RootState) => state.auth.realtimeUnavailable;
 
 // ---------------------------------------------------------------------------
 // Reducer (named export for store wiring)

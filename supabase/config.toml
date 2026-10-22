@@ -1,1 +1,48 @@
 project_id = "bufinkvdidqgxmtfmdsu"
+
+# =============================================================
+# Supabase Auth Configuration
+# See: https://supabase.com/docs/guides/auth
+# =============================================================
+[auth]
+# Allow new user signups. Set to false to disable public signups.
+enable_signup = true
+
+# Require email confirmation before a new user can sign in.
+# This prevents unverified email addresses from creating purchase orders
+# or claiming coins (Requirement 21.15).
+enable_confirmations = true
+
+# The URL the app is served on. Used as the base for email confirmation
+# links and OAuth redirect validation.
+# Replace with your actual production URL before deploying.
+site_url = "https://your-production-domain.com"
+
+# Explicit list of redirect URLs that Supabase Auth will allow after
+# OAuth sign-in. The production domain is always allowed via site_url.
+# Add Vercel / Netlify preview URLs here as needed (Requirement 21.16).
+# Wildcard preview patterns are intentionally avoided — each preview
+# domain must be listed explicitly to prevent OAuth code hijacking.
+additional_redirect_urls = [
+  "http://localhost:5173",
+  "http://localhost:3000",
+  # Add explicit preview deployment URLs below, e.g.:
+  # "https://your-app-git-branch-name.vercel.app",
+]
+
+# =============================================================
+# Email (SMTP) settings for local development
+# For production, configure SMTP in the Supabase dashboard under
+# Project Settings → Auth → SMTP Settings.
+# =============================================================
+[auth.email]
+# Double-confirm email address changes (sends confirmation to both
+# old and new address before the change takes effect).
+double_confirm_changes = true
+
+# Whether to enable the email link ("magic link") sign-in provider.
+enable_signup = true
+
+[auth.sms]
+# SMS-based OTP is not used in this project. Set to false.
+enable_signup = false

@@ -275,8 +275,8 @@ This plan implements the full Supabase backend integration for LoveCoin, replaci
     - **Property 4: Coin numbers are unique after insertion**
     - **Validates: Requirements 10.1, 13.4, 21.7**
 
-- [ ] 11. Create database migrations
-  - [ ] 11.1 Create `supabase/migrations/0001_purchase_orders.sql`
+- [x] 11. Create database migrations
+  - [x] 11.1 Create `supabase/migrations/0001_purchase_orders.sql`
     - Create `purchase_orders` table with columns: `id`, `user_id`, `payment_reference` (unique), `coin_numbers` (integer[]), `total_amount_kobo` (integer), `status` (check: pending/succeeded/failed/cancelled), `bachs_checkout_id`, `bachs_charge_id`, `created_at`, `updated_at`
     - Create indexes on `user_id`, `status`, `payment_reference`
     - Grant `select, insert, update` to `authenticated`, `all` to `service_role`
@@ -284,7 +284,7 @@ This plan implements the full Supabase backend integration for LoveCoin, replaci
     - Create `updated_at` trigger function and trigger
     - _Requirements: 12.1, 12.2, 12.7, 12.8, 21.9_
 
-  - [ ] 11.2 Create `supabase/migrations/0002_lovecoins_rls_change.sql`
+  - [x] 11.2 Create `supabase/migrations/0002_lovecoins_rls_change.sql`
     - Drop the existing `"claim own coin"` insert policy on `lovecoins`
     - No new INSERT policy for authenticated users (service role bypasses RLS, client inserts are rejected)
     - This is the security-critical change enforcing the two-phase claim flow
@@ -293,13 +293,13 @@ This plan implements the full Supabase backend integration for LoveCoin, replaci
     - Verify all `public` schema tables have RLS enabled (Req 21.1)
     - _Requirements: 13.5, 21.1, 21.3, 21.4, 21.5, 21.11_
 
-  - [ ] 11.3 Create `supabase/migrations/0003_storage_buckets.sql`
+  - [x] 11.3 Create `supabase/migrations/0003_storage_buckets.sql`
     - Create `coin-photos` bucket (public) and `note-photos` bucket (public)
     - Storage RLS for `coin-photos`: public read (anon + authenticated), authenticated write to own path only (`storage.foldername(name)[1] = auth.uid()`), authenticated delete own files only
     - Storage RLS for `note-photos`: same pattern as `coin-photos`
     - _Requirements: 1.1, 1.2, 1.3, 19.1, 19.2, 19.3, 19.4, 19.5, 21.13_
 
-  - [ ]* 11.4 Write property test for RLS preventing cross-user profile updates
+  - [x] 11.4 Write property test for RLS preventing cross-user profile updates
     - **Property 8: RLS prevents cross-user profile updates**
     - **Validates: Requirements 6.5, 21.12**
 
@@ -307,27 +307,27 @@ This plan implements the full Supabase backend integration for LoveCoin, replaci
     - **Property 9: RLS prevents cross-user reaction insertion**
     - **Validates: Requirements 21.10**
 
-- [ ] 12. Configure Supabase Auth security settings
+- [x] 12. Configure Supabase Auth security settings
   - Enable email confirmation on new Supabase Auth signups (Supabase dashboard or config)
   - Restrict allowed OAuth redirect URLs to production domain and explicit preview domains only (Supabase dashboard Auth settings)
   - Document the MFA threat model: either enable MFA requirement for purchasing users or document the explicit risk acceptance for the MVP
   - Set the Bachs webhook endpoint URL in the Bachs dashboard to the `bachs-webhook` Edge Function URL
   - _Requirements: 21.14, 21.15, 21.16, 21.19_
 
-- [ ] 13. Regenerate Supabase TypeScript types
+- [x] 13. Regenerate Supabase TypeScript types
   - Run `npx supabase gen types typescript` after migrations are applied
   - Update `src/integrations/supabase/types.ts` with new `purchase_orders` table Row/Insert/Update types
   - Update the Supabase client creation to use `createClient<Database>(...)` for compile-time type checking
   - _Requirements: 16.1, 16.2, 16.3, 16.4, 16.5_
 
-- [ ] 14. Delete old files
+- [x] 14. Delete old files
   - Delete `src/lib/store.tsx` (LoveProvider context store, replaced by RTK Query + RTK slices)
   - Delete `src/lib/payments.ts` (mock `chargeCard` function, replaced by Bachs Edge Function flow)
   - Remove any remaining imports of `useLove` or `chargeCard` across the codebase
   - _Requirements: 22.11_
 
-- [ ] 15. Add real-time subscription manager
-  - [ ] 15.1 Create `src/hooks/useRealtimeSync.ts`
+- [x] 15. Add real-time subscription manager
+  - [x] 15.1 Create `src/hooks/useRealtimeSync.ts`
     - Subscribe to `lovecoins` INSERT events: dispatch `coinsApi.util.updateQueryData('getCoins', ...)` with deduplication check
     - Subscribe to `lovenotes` INSERT events: dispatch `fameApi.util.updateQueryData('getNotes', ...)` with deduplication check
     - Subscribe to `reactions` INSERT and DELETE events: update reaction counts via `fameApi.util.updateQueryData`
@@ -345,24 +345,24 @@ This plan implements the full Supabase backend integration for LoveCoin, replaci
     - **Property 11: Real-time private coin exclusion**
     - **Validates: Requirements 7.3, 21.17**
 
-- [ ] 16. Wire real-time sync and OAuth redirect handling
-  - [ ] 16.1 Call `useRealtimeSync()` in the root layout component
+- [x] 16. Wire real-time sync and OAuth redirect handling
+  - [x] 16.1 Call `useRealtimeSync()` in the root layout component
     - Mount the real-time subscription manager when user is authenticated
     - _Requirements: 7.1, 8.1, 9.1, 22.9_
 
-  - [ ] 16.2 Implement OAuth redirect handling in `src/routes/auth.tsx`
+  - [x] 16.2 Implement OAuth redirect handling in `src/routes/auth.tsx`
     - Pass current page URL or designated redirect target as `redirectTo` to `supabase.auth.signInWithOAuth`
     - Parse access token and session from URL hash or query parameters after OAuth redirect
     - Display error message if OAuth redirect includes error parameter
     - Navigate to previous page if context exists, otherwise to My LoveCoins page
     - _Requirements: 14.1, 14.2, 14.3, 14.4, 14.5_
 
-  - [ ] 16.3 Implement session expiry redirect
+  - [x] 16.3 Implement session expiry redirect
     - The `supabaseBaseQuery` 401 interceptor dispatches `markSessionExpired()` and redirects to `/auth?reason=expired`
     - Clear mutable cached data after session expiry
     - _Requirements: 18.5, 20.4, 21.20_
 
-- [ ] 17. Final checkpoint - Ensure all tests pass and app compiles
+- [x] 17. Final checkpoint - Ensure all tests pass and app compiles
   - Ensure all tests pass, ask the user if questions arise.
 
 ## Notes

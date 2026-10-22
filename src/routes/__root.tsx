@@ -14,6 +14,7 @@ import { reportLovableError } from "../lib/lovable-error-reporting";
 import { StoreProvider } from "@/app/provider";
 import { Layout } from "@/components/Layout";
 import { useAuthInit } from "@/hooks/useAuthInit";
+import { useRealtimeSync } from "@/hooks/useRealtimeSync";
 
 function NotFoundComponent() {
   return (
@@ -129,6 +130,15 @@ function RootComponent() {
   return (
     <StoreProvider>
       <AuthInitializer />
+      {/*
+       * Real-time subscription manager — subscribes to lovecoins and lovenotes
+       * INSERT events whenever the user is authenticated. Reactions channel is
+       * NOT enabled here (subscribeToReactions defaults to false); pages that
+       * display LoveNotes (e.g. love-of-fame) mount their own call with
+       * subscribeToReactions=true.
+       * Requirements: 7.1, 8.1, 9.1, 22.9
+       */}
+      <RealtimeSyncMounter />
       <Layout>
         {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
         <Outlet />
@@ -143,5 +153,22 @@ function RootComponent() {
  */
 function AuthInitializer() {
   useAuthInit();
+  return null;
+}
+
+/**
+ * Real-time sync mounter component.
+ *
+ * Calls `useRealtimeSync` at the root level so that the lovecoins and
+ * lovenotes channels are always active when the user is authenticated,
+ * regardless of which route they are viewing. The reactions channel is kept
+ * off here — pages that render LoveNotes (love-of-fame) pass
+ * `subscribeToReactions: true` in their own `useRealtimeSync` call.
+ *
+ * Must be mounted inside the Redux Provider so it can read auth state and
+ * dispatch RTK Query cache updates (Requirements 7.1, 8.1, 9.1, 22.9).
+ */
+function RealtimeSyncMounter() {
+  useRealtimeSync({ subscribeToReactions: false });
   return null;
 }

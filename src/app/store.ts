@@ -5,8 +5,12 @@
  * paymentsApi, sharingApi) with RTK UI slices (coinsSlice, authSlice).
  * RTK Query middleware is registered for all API slices so that cache
  * invalidation, polling, and subscriptions work correctly.
+ *
+ * A listener middleware is also registered to handle cross-cutting concerns:
+ *   - On `auth/markSessionExpired`: reset all API caches to clear user-specific
+ *     mutable data (Requirements 18.5, 20.4, 21.20).
  */
-import { configureStore } from "@reduxjs/toolkit";
+import { configureStore, createListenerMiddleware } from "@reduxjs/toolkit";
 import { type TypedUseSelectorHook, useDispatch, useSelector } from "react-redux";
 
 // RTK Query API slices
@@ -18,7 +22,30 @@ import { sharingApi } from "@/features/sharing/api/sharingApi";
 
 // RTK UI slices
 import { coinsReducer } from "@/features/coins/slices/coinsSlice";
-import { authReducer } from "@/features/auth/slices/authSlice";
+import { authReducer, markSessionExpired } from "@/features/auth/slices/authSlice";
+
+// ---------------------------------------------------------------------------
+// Session-expiry listener middleware (Requirements 18.5, 20.4, 21.20)
+//
+// When `markSessionExpired` is dispatched (by the supabaseBaseQuery 401
+// interceptor), reset all RTK Query API caches so that user-specific mutable
+// data (purchase orders, coins, notes, reactions) is not visible after the
+// session expires. The browser is simultaneously redirected to /auth by
+// supabaseBaseQuery, so the cleared cache is never read by the UI again.
+// ---------------------------------------------------------------------------
+const sessionExpiryListener = createListenerMiddleware();
+
+sessionExpiryListener.startListening({
+  actionCreator: markSessionExpired,
+  effect: (_action, listenerApi) => {
+    // Reset all API caches to clear any mutable user-specific cached data.
+    listenerApi.dispatch(authApi.util.resetApiState());
+    listenerApi.dispatch(coinsApi.util.resetApiState());
+    listenerApi.dispatch(fameApi.util.resetApiState());
+    listenerApi.dispatch(paymentsApi.util.resetApiState());
+    listenerApi.dispatch(sharingApi.util.resetApiState());
+  },
+});
 
 export const store = configureStore({
   reducer: {
@@ -35,6 +62,9 @@ export const store = configureStore({
   },
   middleware: (getDefaultMiddleware) =>
     getDefaultMiddleware()
+      // Session-expiry cache-clear listener runs before API middleware so the
+      // cache is flushed before any pending queries re-run.
+      .prepend(sessionExpiryListener.middleware)
       .concat(authApi.middleware)
       .concat(coinsApi.middleware)
       .concat(fameApi.middleware)
