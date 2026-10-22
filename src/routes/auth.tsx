@@ -1,13 +1,24 @@
-import { createFileRoute, useNavigate, useRouterState } from "@tanstack/react-router";
+import { createFileRoute, useNavigate, useSearch } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
-import { lovable } from "@/integrations/lovable/index";
+import {
+  useSignInWithGoogleMutation,
+  useSignInWithEmailMutation,
+  useSignUpWithEmailMutation,
+} from "@/features/auth/api/authApi";
 import { useAppSelector } from "@/app/store";
 import { selectCurrentUser } from "@/features/auth/slices/authSlice";
+import { z } from "zod";
 
 const TITLE = "Sign in — LoveCoin";
 const DESC =
   "Sign in to keep your LoveCoins, LoveNotes and reactions safe on every device you use.";
+
+// Search params: optional `redirectTo` for post-auth redirect
+const searchSchema = z.object({
+  redirectTo: z.string().optional(),
+  error: z.string().optional(),
+  error_description: z.string().optional(),
+});
 
 export const Route = createFileRoute("/auth")({
   head: () => ({
@@ -18,70 +29,107 @@ export const Route = createFileRoute("/auth")({
       { property: "og:description", content: DESC },
     ],
   }),
+  validateSearch: searchSchema,
   component: AuthPage,
 });
 
 function AuthPage() {
   const currentUser = useAppSelector(selectCurrentUser);
   const navigate = useNavigate();
-  const pathname = useRouterState({ select: (s) => s.location.pathname });
+
+  // Read search params via TanStack Router's typed useSearch
+  const search = useSearch({ from: "/auth" });
+  const redirectTo = search.redirectTo;
+  // OAuth error passed back in URL query params (e.g. provider denied access)
+  const oauthError = search.error_description ?? search.error ?? null;
 
   const [mode, setMode] = useState<"signin" | "signup">("signin");
   const [displayName, setDisplayName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
 
-  useEffect(() => {
-    if (currentUser && pathname === "/auth") {
-      void navigate({ to: "/my-lovecoins", replace: true });
-    }
-  }, [currentUser, navigate, pathname]);
+  // RTK Query mutations
+  const [signInWithGoogle, { isLoading: isGoogleLoading }] = useSignInWithGoogleMutation();
+  const [signInWithEmail, { isLoading: isEmailSignInLoading }] = useSignInWithEmailMutation();
+  const [signUpWithEmail, { isLoading: isSignUpLoading }] = useSignUpWithEmailMutation();
 
-  const submit = async (e: React.FormEvent) => {
+  const busy = isGoogleLoading || isEmailSignInLoading || isSignUpLoading;
+
+  // When auth state is populated (sign-in succeeded), navigate away.
+  // Priority: redirectTo param → /my-lovecoins
+  useEffect(() => {
+    if (currentUser) {
+      if (redirectTo) {
+        // Use window.location for arbitrary redirectTo paths to avoid TS
+        // route-type constraints on navigate({ to }).
+        window.location.replace(redirectTo);
+      } else {
+        void navigate({ to: "/my-lovecoins", replace: true });
+      }
+    }
+  }, [currentUser, navigate, redirectTo]);
+
+  // Show OAuth error surfaced in URL params (e.g. "access_denied")
+  useEffect(() => {
+    if (oauthError) {
+      setError(decodeURIComponent(oauthError));
+    }
+  }, [oauthError]);
+
+  const handleSubmit = async (e: React.SyntheticEvent<HTMLFormElement>) => {
     e.preventDefault();
-    setBusy(true);
     setError(null);
     setNotice(null);
 
     if (mode === "signup") {
-      const { data, error: err } = await supabase.auth.signUp({
+      const result = await signUpWithEmail({
         email: email.trim(),
         password,
-        options: {
-          emailRedirectTo: window.location.origin,
-          data: { display_name: displayName.trim() || email.split("@")[0] },
-        },
+        displayName: displayName.trim() || email.split("@")[0] || email,
       });
-      setBusy(false);
-      if (err) {
-        setError(err.message);
+
+      if ("error" in result) {
+        const err = result.error as { message?: string } | undefined;
+        setError(err?.message ?? "Sign up failed. Please try again.");
         return;
       }
-      if (!data.session) {
-        setNotice("Check your email to confirm your address, then come back and sign in.");
-      }
+
+      // Supabase sends a confirmation email for new sign-ups; no session yet.
+      setNotice("Check your email to confirm your address, then come back and sign in.");
       return;
     }
 
-    const { error: err } = await supabase.auth.signInWithPassword({
+    // Sign in with email + password
+    const result = await signInWithEmail({
       email: email.trim(),
       password,
     });
-    setBusy(false);
-    if (err) setError(err.message);
+
+    if ("error" in result) {
+      const err = result.error as { message?: string } | undefined;
+      setError(err?.message ?? "Sign in failed. Please check your email and password.");
+    }
+    // On success, the useAuthInit hook picks up the session change and
+    // dispatches setCurrentUser, which triggers the useEffect above to navigate.
   };
 
-  const googleSignIn = async () => {
+  const handleGoogleSignIn = async () => {
     setError(null);
-    const result = await lovable.auth.signInWithOAuth("google", {
-      redirect_uri: window.location.origin,
-    });
-    if (result.error) {
+
+    // Build the redirect URL so Supabase returns the user to this page
+    // (which then navigates to redirectTo or /my-lovecoins via the useEffect).
+    const redirectUri = `${window.location.origin}/auth${
+      redirectTo ? `?redirectTo=${encodeURIComponent(redirectTo)}` : ""
+    }`;
+
+    const result = await signInWithGoogle({ redirectTo: redirectUri });
+
+    if ("error" in result) {
       setError("We couldn't reach Google just then. Please try again.");
     }
+    // On success the browser is redirected to Google; no further action here.
   };
 
   return (
@@ -96,8 +144,13 @@ function AuthPage() {
         </p>
       </div>
 
-      <button type="button" onClick={googleSignIn} className="btn-base btn-ghosted mt-8 w-full">
-        Continue with Google
+      <button
+        type="button"
+        onClick={handleGoogleSignIn}
+        disabled={busy}
+        className="btn-base btn-ghosted mt-8 w-full disabled:opacity-50"
+      >
+        {isGoogleLoading ? "Redirecting to Google…" : "Continue with Google"}
       </button>
 
       <div className="my-6 flex items-center gap-4">
@@ -106,7 +159,7 @@ function AuthPage() {
         <span className="h-px flex-1 bg-border" />
       </div>
 
-      <form onSubmit={submit} className="space-y-4">
+      <form onSubmit={handleSubmit} className="space-y-4">
         {mode === "signup" ? (
           <div>
             <label className="mb-2 block text-sm font-semibold" htmlFor="display-name">
@@ -119,6 +172,7 @@ function AuthPage() {
               onChange={(e) => setDisplayName(e.target.value)}
               placeholder="Simi"
               autoComplete="name"
+              disabled={busy}
             />
           </div>
         ) : null}
@@ -135,6 +189,7 @@ function AuthPage() {
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             autoComplete="email"
+            disabled={busy}
           />
         </div>
 
@@ -151,14 +206,23 @@ function AuthPage() {
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             autoComplete={mode === "signup" ? "new-password" : "current-password"}
+            disabled={busy}
           />
         </div>
 
         {error ? <p className="text-sm text-primary">{error}</p> : null}
         {notice ? <p className="text-sm text-muted-foreground">{notice}</p> : null}
 
-        <button type="submit" disabled={busy} className="btn-base btn-primary w-full disabled:opacity-50">
-          {busy ? "One moment…" : mode === "signin" ? "Sign in" : "Create my account"}
+        <button
+          type="submit"
+          disabled={busy}
+          className="btn-base btn-primary w-full disabled:opacity-50"
+        >
+          {busy
+            ? "One moment…"
+            : mode === "signin"
+              ? "Sign in"
+              : "Create my account"}
         </button>
       </form>
 

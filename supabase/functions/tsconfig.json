@@ -1,0 +1,26 @@
+{
+  // TypeScript config for Supabase Edge Functions (Deno runtime).
+  //
+  // NOT used by the Vite/Node build — the root tsconfig.json explicitly
+  // excludes supabase/functions/. This config exists so the editor's
+  // TypeScript language server can type-check Edge Functions without
+  // false-positive errors for Deno globals and Web API types.
+  //
+  // - "lib": ES2022 + DOM gives us Request, Response, fetch, Headers, crypto.
+  // - _shared/globals.d.ts declares the Deno namespace stub.
+  // - @supabase/supabase-js is resolved from node_modules (npm specifier).
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "strict": true,
+    "noEmit": true,
+    "skipLibCheck": true
+  },
+  "include": [
+    "./_shared/globals.d.ts",
+    "./create-bachs-checkout/index.ts",
+    "./bachs-webhook/index.ts"
+  ]
+}

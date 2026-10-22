@@ -1,5 +1,12 @@
 {
   "include": ["src/**/*.ts", "src/**/*.tsx", "vite.config.ts", "eslint.config.js"],
+  "exclude": [
+    // Supabase Edge Functions run on Deno, not Node/Vite.
+    // They use JSR imports and Deno globals that the project TypeScript compiler
+    // does not understand. Each function directory has its own deno.json / tsconfig
+    // that the Deno language server uses instead.
+    "supabase/functions"
+  ],
   "compilerOptions": {
     "target": "ES2022",
     "jsx": "react-jsx",

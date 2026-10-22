@@ -193,7 +193,7 @@ This plan implements the full Supabase backend integration for LoveCoin, replaci
     - Display total amount (spot count × ₦100) and selected spot count
     - _Requirements: 11.4_
 
-  - [ ] 8.11 Create `src/features/payments/components/PaymentConfirming.tsx`
+  - [x] 8.11 Create `src/features/payments/components/PaymentConfirming.tsx`
     - "Confirming your payment" state after Bachs redirect
     - Polls `paymentsApi.getOrderStatus` until status transitions to "succeeded" or "failed"
     - On "succeeded": navigate to coin detail page
@@ -201,7 +201,7 @@ This plan implements the full Supabase backend integration for LoveCoin, replaci
     - On cancel: call `paymentsApi.cancelPurchaseOrder`, display cancelled message
     - _Requirements: 4.4, 4.5, 4.6, 12.6, 18.2_
 
-  - [ ] 8.12 Refactor route components to use RTK Query
+  - [x] 8.12 Refactor route components to use RTK Query
     - `src/routes/explore.tsx`: use `coinsApi.getCoins` instead of `useLove().coins`
     - `src/routes/love-of-fame.tsx`: use `fameApi.getNotes` + `fameApi.getReactions` instead of `useLove()`
     - `src/routes/my-lovecoins.tsx`: use `coinsApi.getMyCoins` + `coinsApi.getReceivedCoins` + `authApi.getProfile` + `ProfileEditor`
@@ -209,16 +209,16 @@ This plan implements the full Supabase backend integration for LoveCoin, replaci
     - `src/routes/auth.tsx`: use `authApi` for sign-in/out, handle OAuth redirect (parse token from URL, navigate to previous page or My LoveCoins)
     - _Requirements: 14.1, 14.2, 14.3, 14.4, 14.5, 15.1, 17.1, 17.5, 22.7, 22.11_
 
-  - [ ] 8.13 Create `src/features/sharing/components/ShareKeepsakeButton.tsx`
+  - [x] 8.13 Create `src/features/sharing/components/ShareKeepsakeButton.tsx`
     - Use `sharingApi.createShareLink` and `sharingApi.getShareableCoin`
     - Web Share API with copy-link fallback
     - _Requirements: 22.4_
 
-- [ ] 9. Checkpoint - Ensure all migrated components compile and render
+- [x] 9. Checkpoint - Ensure all migrated components compile and render
   - Ensure all tests pass, ask the user if questions arise.
 
-- [ ] 10. Create Edge Functions
-  - [ ] 10.1 Create `supabase/functions/create-bachs-checkout/index.ts`
+- [x] 10. Create Edge Functions
+  - [x] 10.1 Create `supabase/functions/create-bachs-checkout/index.ts`
     - Verify caller JWT from `Authorization` header using Supabase client
     - Load `purchase_order` by `orderId` with service-role client, verify `user_id` matches caller and status is "pending"
     - Verify all `coinNumbers` are currently unclaimed (no `lovecoins` row with that `coin_number`)
@@ -229,7 +229,7 @@ This plan implements the full Supabase backend integration for LoveCoin, replaci
     - Error responses: 401 (unauthenticated), 403 (order mismatch or not pending), 409 (coin claimed), 500 (Bachs API error)
     - _Requirements: 4.1, 4.2, 4.3, 4.7, 4.8, 4.9, 4.10, 12.3, 21.2, 21.5_
 
-  - [ ] 10.2 Create `supabase/functions/bachs-webhook/index.ts`
+  - [x] 10.2 Create `supabase/functions/bachs-webhook/index.ts`
     - Read exact raw request body (before JSON parsing) for signature verification
     - Verify `X-Bachs-Signature` using HMAC SHA-256 with `BACHS_WEBHOOK_SECRET`
     - Check `X-Bachs-Timestamp` is within tolerance window (300 seconds)
