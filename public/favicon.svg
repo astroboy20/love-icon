@@ -1,0 +1,60 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <defs>
+    <!-- Coin body: warm gold gradient -->
+    <radialGradient id="coinGrad" cx="38%" cy="35%" r="65%">
+      <stop offset="0%"  stop-color="#e8c97a"/>
+      <stop offset="55%" stop-color="#c9a448"/>
+      <stop offset="100%" stop-color="#8c6a1e"/>
+    </radialGradient>
+    <!-- Coin rim: deeper gold ring -->
+    <radialGradient id="rimGrad" cx="38%" cy="35%" r="65%">
+      <stop offset="0%"  stop-color="#f0d98a"/>
+      <stop offset="100%" stop-color="#7a5a14"/>
+    </radialGradient>
+    <!-- Heart: rose-red gradient -->
+    <linearGradient id="heartGrad" x1="30%" y1="0%" x2="70%" y2="100%">
+      <stop offset="0%"  stop-color="#e8607a"/>
+      <stop offset="100%" stop-color="#a8253a"/>
+    </linearGradient>
+    <!-- Inner coin sheen -->
+    <radialGradient id="sheenGrad" cx="40%" cy="28%" r="50%">
+      <stop offset="0%"  stop-color="#fff8e8" stop-opacity="0.45"/>
+      <stop offset="100%" stop-color="#fff8e8" stop-opacity="0"/>
+    </radialGradient>
+    <!-- Drop shadow filter -->
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="130%">
+      <feDropShadow dx="0" dy="2" stdDeviation="2.5" flood-color="#5a3a0a" flood-opacity="0.35"/>
+    </filter>
+  </defs>
+
+  <!-- Coin outer rim -->
+  <circle cx="32" cy="32" r="30" fill="url(#rimGrad)" filter="url(#shadow)"/>
+
+  <!-- Coin face -->
+  <circle cx="32" cy="31" r="27" fill="url(#coinGrad)"/>
+
+  <!-- Inner deboss ring -->
+  <circle cx="32" cy="31" r="22.5" fill="none" stroke="#b8902a" stroke-width="1.2" opacity="0.6"/>
+
+  <!-- Sheen overlay -->
+  <circle cx="32" cy="31" r="27" fill="url(#sheenGrad)"/>
+
+  <!-- Heart path centred at (32, 31) -->
+  <!-- Using standard heart: two arcs + point, scaled to ~22px wide -->
+  <path
+    d="M32 42
+       C32 42 18 34.5 18 25.5
+       C18 20.5 22.5 17 27 19.5
+       C29 20.6 30.7 22.2 32 24
+       C33.3 22.2 35 20.6 37 19.5
+       C41.5 17 46 20.5 46 25.5
+       C46 34.5 32 42 32 42 Z"
+    fill="url(#heartGrad)"
+    stroke="#8a1a2e"
+    stroke-width="0.6"
+    opacity="0.97"
+  />
+
+  <!-- Tiny highlight on heart -->
+  <ellipse cx="26.5" cy="23.5" rx="3.2" ry="2" fill="#fff" opacity="0.22" transform="rotate(-20 26.5 23.5)"/>
+</svg>
