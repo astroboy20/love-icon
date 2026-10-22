@@ -12,6 +12,7 @@
  * Requirements: 6.1, 6.2, 6.3, 6.4
  */
 import * as React from "react";
+import { toast } from "sonner";
 import { useAppDispatch, useAppSelector } from "@/app/store";
 import { selectCurrentUser, setCurrentUser } from "@/features/auth/slices/authSlice";
 import { useUpdateDisplayNameMutation } from "@/features/auth/api/authApi";
@@ -43,8 +44,6 @@ export function ProfileEditor({ className }: { className?: string }) {
 
   // Local form state
   const [displayName, setDisplayName] = React.useState(currentUser?.displayName ?? "");
-  const [successMessage, setSuccessMessage] = React.useState<string | null>(null);
-  const [errorMessage, setErrorMessage] = React.useState<string | null>(null);
 
   // Keep input in sync if currentUser changes externally (e.g., session restore)
   React.useEffect(() => {
@@ -63,14 +62,10 @@ export function ProfileEditor({ className }: { className?: string }) {
   const handleSubmit = async (e: React.SyntheticEvent<HTMLFormElement>) => {
     e.preventDefault();
 
-    // Reset feedback
-    setSuccessMessage(null);
-    setErrorMessage(null);
-
     const trimmed = displayName.trim();
 
     if (!trimmed) {
-      setErrorMessage("Display name cannot be empty.");
+      toast.error("Display name cannot be empty.");
       return;
     }
 
@@ -80,9 +75,8 @@ export function ProfileEditor({ className }: { className?: string }) {
     });
 
     if ("error" in result) {
-      // Requirement 6.4 — display error in the UI
       const err = result.error as { message?: string } | undefined;
-      setErrorMessage(err?.message ?? "Failed to update display name. Please try again.");
+      toast.error(err?.message ?? "Failed to update display name. Please try again.");
       return;
     }
 
@@ -94,7 +88,7 @@ export function ProfileEditor({ className }: { className?: string }) {
       }),
     );
 
-    setSuccessMessage("Display name updated successfully.");
+    toast.success("Display name updated successfully.");
   };
 
   // -------------------------------------------------------------------------
@@ -113,39 +107,13 @@ export function ProfileEditor({ className }: { className?: string }) {
                 id="profile-display-name"
                 type="text"
                 value={displayName}
-                onChange={(e) => {
-                  setDisplayName(e.target.value);
-                  // Clear feedback when the user starts typing again
-                  setSuccessMessage(null);
-                  setErrorMessage(null);
-                }}
+                onChange={(e) => setDisplayName(e.target.value)}
                 disabled={isLoading}
                 placeholder="Your display name"
                 autoComplete="nickname"
                 maxLength={100}
               />
             </div>
-
-            {/* Error alert — Requirement 6.4 */}
-            {errorMessage && (
-              <div
-                role="alert"
-                className="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive"
-              >
-                {errorMessage}
-              </div>
-            )}
-
-            {/* Success message */}
-            {successMessage && !errorMessage && (
-              <div
-                role="status"
-                aria-live="polite"
-                className="rounded-md border border-emerald-300/40 bg-emerald-50 px-3 py-2 text-sm text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-400"
-              >
-                {successMessage}
-              </div>
-            )}
 
             {/* Save button — disabled + loading state while in-flight */}
             <Button

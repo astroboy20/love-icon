@@ -23,6 +23,7 @@
  */
 import * as React from "react";
 import { Share2, Link, Check, Loader2 } from "lucide-react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import {
@@ -77,7 +78,6 @@ export function ShareKeepsakeButton({
   // ── Local UI state ────────────────────────────────────────────────────────
   type FeedbackKind = "shared" | "copied" | "error" | null;
   const [feedback, setFeedback] = React.useState<FeedbackKind>(null);
-  const [errorMessage, setErrorMessage] = React.useState<string | null>(null);
   const feedbackTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Clean up any pending feedback timer on unmount.
@@ -117,10 +117,8 @@ export function ShareKeepsakeButton({
     try {
       await navigator.clipboard.writeText(url);
       showFeedback("copied");
-      setErrorMessage(null);
     } catch {
-      // Clipboard write can be denied (e.g. iframe sandbox, non-secure context).
-      setErrorMessage("Could not copy link. Please copy it manually.");
+      toast.error("Could not copy link. Please copy it manually.");
       showFeedback("error");
     }
   };
@@ -130,13 +128,11 @@ export function ShareKeepsakeButton({
   const handleShare = async () => {
     if (isCreatingLink || feedback === "shared" || feedback === "copied") return;
 
-    setErrorMessage(null);
-
     // 1. Generate the shareable URL.
     const result = await createShareLink({ coinNumber });
 
     if ("error" in result || !result.data) {
-      setErrorMessage("Could not generate share link. Please try again.");
+      toast.error("Could not generate share link. Please try again.");
       showFeedback("error");
       return;
     }
@@ -196,38 +192,25 @@ export function ShareKeepsakeButton({
   // ── Render ────────────────────────────────────────────────────────────────
 
   return (
-    <div className="inline-flex flex-col items-start gap-1">
-      <Button
-        type="button"
-        variant={variant}
-        size={size}
-        disabled={isLoading}
-        onClick={handleShare}
-        aria-label={ariaLabel}
-        aria-live="polite"
-        className={cn(
-          "transition-all",
-          feedback === "copied" || feedback === "shared"
-            ? "border-green-500/40 text-green-600"
-            : "",
-          feedback === "error" ? "border-destructive/40 text-destructive" : "",
-          className,
-        )}
-      >
-        {iconNode}
-        {!iconOnly && <span>{visibleLabel}</span>}
-      </Button>
-
-      {/* Error message — visible only when clipboard write fails. */}
-      {feedback === "error" && errorMessage && (
-        <p
-          role="alert"
-          className="text-xs text-destructive"
-          aria-live="assertive"
-        >
-          {errorMessage}
-        </p>
+    <Button
+      type="button"
+      variant={variant}
+      size={size}
+      disabled={isLoading}
+      onClick={handleShare}
+      aria-label={ariaLabel}
+      aria-live="polite"
+      className={cn(
+        "transition-all",
+        feedback === "copied" || feedback === "shared"
+          ? "border-green-500/40 text-green-600"
+          : "",
+        feedback === "error" ? "border-destructive/40 text-destructive" : "",
+        className,
       )}
-    </div>
+    >
+      {iconNode}
+      {!iconOnly && <span>{visibleLabel}</span>}
+    </Button>
   );
 }

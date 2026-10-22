@@ -16,6 +16,7 @@
  */
 import * as React from "react";
 import { useNavigate, useSearch } from "@tanstack/react-router";
+import { toast } from "sonner";
 import { Modal } from "@/components/Modal";
 import {
   CoinPersonalizationForm,
@@ -65,7 +66,6 @@ interface ConfirmingStateProps {
 }
 
 function ConfirmingState({ orderId, onSuccess, onFailed, coinNumbers }: ConfirmingStateProps) {
-  // Poll every 3 seconds until the order settles.
   const { data: order, error } = useGetOrderStatusQuery(orderId, {
     pollingInterval: 3000,
     skip: !orderId,
@@ -87,7 +87,6 @@ function ConfirmingState({ orderId, onSuccess, onFailed, coinNumbers }: Confirmi
 
   return (
     <div className="flex flex-col items-center gap-6 py-8 text-center">
-      {/* Spinner */}
       <div
         className="h-12 w-12 rounded-full border-4 border-primary border-t-transparent animate-spin"
         role="status"
@@ -107,48 +106,29 @@ function ConfirmingState({ orderId, onSuccess, onFailed, coinNumbers }: Confirmi
 // ClaimFlow — main modal component
 // ---------------------------------------------------------------------------
 
-/**
- * ClaimFlow modal drives the full claim flow for multi-spot coin purchases.
- *
- * It reads state from the Redux store (`coinsSlice`) and dispatches actions
- * to close the modal and clear the selection on completion.
- *
- * The `orderId` query param is read to detect the post-Bachs redirect state
- * so the component can jump directly to the "confirming" step when the user
- * returns from the Bachs hosted checkout.
- */
 export function ClaimFlow() {
   const dispatch = useAppDispatch();
   const navigate = useNavigate();
 
-  // ---- Redux state ----
   const isOpen = useAppSelector(selectIsClaimFlowOpen);
   const selectedCoinNumbers = useAppSelector(selectSelectedCoinNumbers);
   const currentUser = useAppSelector(selectCurrentUser);
 
-  // ---- RTK mutations ----
   const [createPurchaseOrder] = useCreatePurchaseOrderMutation();
   const [createBachsCheckout] = useCreateBachsCheckoutMutation();
-  // uploadCoinPhoto is used inside CoinPhotoUploader, but we need it here too
-  // for uploading photos that haven't gone through the uploader yet.
-  // We don't use it directly here because CoinPhotoUploader handles its own upload.
 
-  // ---- Local UI state ----
   const [step, setStep] = React.useState<FlowStep>("personalizing");
   const [spots, setSpots] = React.useState<SpotPersonalization[]>([]);
   const [expandedIndex, setExpandedIndex] = React.useState<number | null>(0);
-  const [errorMessage, setErrorMessage] = React.useState<string | null>(null);
+  // conflictError stays as local state so the inline "pick another spot" hint
+  // remains visible right next to the checkout button where it's most useful.
   const [conflictError, setConflictError] = React.useState(false);
   const [confirmingOrderId, setConfirmingOrderId] = React.useState<string | null>(null);
   const [confirmingCoinNumbers, setConfirmingCoinNumbers] = React.useState<number[]>([]);
 
   // ---- Post-Bachs redirect: check for ?orderId in URL ----
-  // We wrap in try/catch because the route may not expose this search param.
   let searchOrderId: string | null = null;
   try {
-    // TanStack Router's useSearch returns the current route's search params.
-    // We cast to `any` because the shape varies by route and this component
-    // may be rendered on routes that don't declare `orderId` as a param.
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const search = useSearch({ strict: false }) as any;
     searchOrderId = typeof search?.orderId === "string" ? search.orderId : null;
@@ -156,11 +136,9 @@ export function ClaimFlow() {
     searchOrderId = null;
   }
 
-  // When the user returns from Bachs redirect, open the confirming step.
   React.useEffect(() => {
     if (searchOrderId && step !== "confirming") {
       setConfirmingOrderId(searchOrderId);
-      // Restore coin numbers from localStorage if available (set before redirect).
       const stored = localStorage.getItem("lovecoin_pending_coin_numbers");
       if (stored) {
         try {
@@ -171,42 +149,33 @@ export function ClaimFlow() {
         }
       }
       setStep("confirming");
-      // Open the modal so the confirming state is visible.
-      // (The modal is controlled by isOpen from the Redux store;
-      // if it's not open we still show confirming via the inline render below)
     }
   }, [searchOrderId]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Sync spot list when selectedCoinNumbers changes (e.g. user adds/removes spots before opening).
   React.useEffect(() => {
     setSpots((prev) => {
       const prevMap = new Map(prev.map((s) => [s.coinNumber, s]));
-      return selectedCoinNumbers.map(
-        (n) => prevMap.get(n) ?? makeDefaultSpot(n),
-      );
+      return selectedCoinNumbers.map((n) => prevMap.get(n) ?? makeDefaultSpot(n));
     });
   }, [selectedCoinNumbers]);
 
-  // Reset local state whenever the modal opens fresh.
   React.useEffect(() => {
     if (isOpen && step !== "confirming") {
       setStep("personalizing");
-      setErrorMessage(null);
       setConflictError(false);
     }
   }, [isOpen]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // ---- Helpers ----
-
   const spotCount = spots.length;
   const totalKobo = calculateTotalKobo(spotCount);
   const totalNairaDisplay = `₦${koboToNairaString(totalKobo).replace(/\.00$/, "")}`;
-  const canCheckout = spotCount >= MIN_SPOTS && spots.every((s) => s.creatorName.trim() && s.recipientName.trim());
+  const canCheckout =
+    spotCount >= MIN_SPOTS &&
+    spots.every((s) => s.creatorName.trim() && s.recipientName.trim());
 
   const close = React.useCallback(() => {
     dispatch(closeClaimFlow());
     setStep("personalizing");
-    setErrorMessage(null);
     setConflictError(false);
     setExpandedIndex(0);
   }, [dispatch]);
@@ -215,34 +184,30 @@ export function ClaimFlow() {
     setSpots((prev) => prev.map((s) => (s.coinNumber === coinNumber ? updated : s)));
   }, []);
 
-  const applyToAll = React.useCallback(
-    (fields: BulkApplyFields) => {
-      setSpots((prev) =>
-        prev.map((s) => ({
-          ...s,
-          ...(fields.creatorName ? { creatorName: fields.creatorName } : {}),
-          ...(fields.recipientName ? { recipientName: fields.recipientName } : {}),
-          style: fields.style,
-        })),
-      );
-    },
-    [],
-  );
+  const applyToAll = React.useCallback((fields: BulkApplyFields) => {
+    setSpots((prev) =>
+      prev.map((s) => ({
+        ...s,
+        ...(fields.creatorName ? { creatorName: fields.creatorName } : {}),
+        ...(fields.recipientName ? { recipientName: fields.recipientName } : {}),
+        style: fields.style,
+      })),
+    );
+  }, []);
 
   // ---- Checkout handler ----
 
   const handleCheckout = async () => {
     if (!currentUser) return;
     if (spotCount < MIN_SPOTS) {
-      setErrorMessage(`Please select at least ${MIN_SPOTS} spots to proceed.`);
+      toast.error(`Please select at least ${MIN_SPOTS} spots to proceed.`);
       return;
     }
     if (!canCheckout) {
-      setErrorMessage("Please add a name for each spot before checking out.");
+      toast.error("Please add a name for each spot before checking out.");
       return;
     }
 
-    setErrorMessage(null);
     setConflictError(false);
     setStep("paying");
 
@@ -262,7 +227,7 @@ export function ClaimFlow() {
         if (isCoinNumberConflictError(err)) {
           setConflictError(true);
         } else {
-          setErrorMessage(
+          toast.error(
             typeof err === "object" && err !== null && "message" in err
               ? String((err as { message: unknown }).message)
               : "Failed to create your order. Please try again.",
@@ -283,7 +248,7 @@ export function ClaimFlow() {
       });
 
       if ("error" in checkoutResult) {
-        setErrorMessage(
+        toast.error(
           typeof checkoutResult.error === "object" &&
             checkoutResult.error !== null &&
             "message" in checkoutResult.error
@@ -294,14 +259,10 @@ export function ClaimFlow() {
         return;
       }
 
-      // Persist coin numbers to localStorage before redirect so we can restore
-      // them when the user returns from Bachs.
       localStorage.setItem("lovecoin_pending_coin_numbers", JSON.stringify(coinNumbers));
-
-      // Step 3: Redirect to Bachs hosted checkout.
       window.location.href = checkoutResult.data.checkoutUrl;
-    } catch (err) {
-      setErrorMessage("An unexpected error occurred. Please try again.");
+    } catch {
+      toast.error("An unexpected error occurred. Please try again.");
       setStep("personalizing");
     }
   };
@@ -319,13 +280,13 @@ export function ClaimFlow() {
   );
 
   const handlePaymentFailed = React.useCallback(() => {
-    setErrorMessage("Payment failed. Please try again or contact support.");
+    toast.error("Payment failed. Please try again or contact support.");
     setStep("personalizing");
     setConfirmingOrderId(null);
     localStorage.removeItem("lovecoin_pending_coin_numbers");
   }, []);
 
-  // ---- Render: confirming state (may render outside of isOpen when post-redirect) ----
+  // ---- Render: confirming ----
 
   if (step === "confirming" && confirmingOrderId) {
     return (
@@ -368,7 +329,7 @@ export function ClaimFlow() {
 
   if (!isOpen) return null;
 
-  // ---- Render: paying state ----
+  // ---- Render: paying ----
 
   if (step === "paying") {
     return (
@@ -392,11 +353,10 @@ export function ClaimFlow() {
     );
   }
 
-  // ---- Render: personalizing step ----
+  // ---- Render: personalizing ----
 
   return (
     <Modal open={isOpen} onClose={close} labelledBy="claim-title">
-      {/* Header */}
       <div className="text-center">
         <h2 id="claim-title" className="font-display text-3xl text-primary">
           Claim your pieces of love.
@@ -411,7 +371,6 @@ export function ClaimFlow() {
         )}
       </div>
 
-      {/* Spot list */}
       <div className="mt-6 space-y-3">
         {spots.length === 0 ? (
           <p className="text-center text-sm text-muted-foreground py-6">
@@ -419,12 +378,7 @@ export function ClaimFlow() {
           </p>
         ) : (
           <>
-            {/* Bulk apply */}
-            {spots.length > 1 && (
-              <BulkApplyBar onApply={applyToAll} />
-            )}
-
-            {/* Per-spot forms */}
+            {spots.length > 1 && <BulkApplyBar onApply={applyToAll} />}
             {spots.map((spot, idx) => (
               <CoinPersonalizationForm
                 key={spot.coinNumber}
@@ -438,7 +392,6 @@ export function ClaimFlow() {
         )}
       </div>
 
-      {/* Total + checkout button */}
       <div className="mt-8 space-y-3">
         <div className="flex items-center justify-between rounded-xl bg-muted/40 px-4 py-3">
           <span className="text-sm font-medium">
@@ -447,15 +400,10 @@ export function ClaimFlow() {
           <span className="font-display text-xl text-primary">{totalNairaDisplay}</span>
         </div>
 
+        {/* Conflict hint stays inline — it's contextual UI tied to the checkout button */}
         {conflictError && (
           <p className="rounded-xl bg-destructive/10 px-4 py-3 text-sm text-destructive" role="alert">
             This coin was just claimed — pick another spot on the heart.
-          </p>
-        )}
-
-        {errorMessage && !conflictError && (
-          <p className="rounded-xl bg-destructive/10 px-4 py-3 text-sm text-destructive" role="alert">
-            {errorMessage}
           </p>
         )}
 

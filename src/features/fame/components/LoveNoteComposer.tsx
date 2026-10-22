@@ -19,6 +19,7 @@
  */
 import * as React from "react";
 import { useNavigate } from "@tanstack/react-router";
+import { toast } from "sonner";
 import { Modal } from "@/components/Modal";
 import { usePublishNoteMutation, useUploadNotePhotoMutation } from "@/features/fame/api/fameApi";
 import { useAppSelector } from "@/app/store";
@@ -65,7 +66,6 @@ export function LoveNoteComposer({
   const [photoPreview, setPhotoPreview] = React.useState<string | null>(null);
   const [coinId, setCoinId] = React.useState<string>(presetCoinId ?? "");
   const [published, setPublished] = React.useState(false);
-  const [errorMessage, setErrorMessage] = React.useState<string | null>(null);
 
   // Keep a ref to the object URL so we can revoke it on cleanup.
   const prevObjectUrl = React.useRef<string | null>(null);
@@ -95,14 +95,12 @@ export function LoveNoteComposer({
   // ---------------------------------------------------------------------------
 
   const close = () => {
-    // Reset all form state so the composer is clean on next open.
     setContent("");
     setCategory("Kindness");
     setPhotoFile(null);
     setPhotoPreview(null);
     setCoinId(presetCoinId ?? "");
     setPublished(false);
-    setErrorMessage(null);
 
     if (prevObjectUrl.current) {
       URL.revokeObjectURL(prevObjectUrl.current);
@@ -122,16 +120,12 @@ export function LoveNoteComposer({
 
     setPhotoFile(null);
     setPhotoPreview(null);
-    setErrorMessage(null);
 
     if (!file) return;
 
-    // Basic client-side MIME check. Server validates as well.
     const accepted = ["image/jpeg", "image/png", "image/webp", "image/gif"];
     if (!accepted.includes(file.type)) {
-      setErrorMessage(
-        `Unsupported file type "${file.type}". Please choose a JPEG, PNG, WebP, or GIF image.`,
-      );
+      toast.error(`Unsupported file type "${file.type}". Please choose a JPEG, PNG, WebP, or GIF image.`);
       return;
     }
 
@@ -150,21 +144,14 @@ export function LoveNoteComposer({
   const handleSubmit = async () => {
     if (!content.trim() || !currentUser) return;
 
-    setErrorMessage(null);
-
     let imageUrl: string | null = null;
 
-    // Step 1: Upload photo if one was selected (Requirements 3.1, 3.2, 3.5).
     if (photoFile) {
-      const uploadResult = await uploadNotePhoto({
-        file: photoFile,
-        userId: currentUser.id,
-      });
+      const uploadResult = await uploadNotePhoto({ file: photoFile, userId: currentUser.id });
 
       if ("error" in uploadResult) {
-        // Requirement 3.3: upload failed → show error, do NOT publish.
         const err = uploadResult.error;
-        setErrorMessage(
+        toast.error(
           typeof err === "object" && err !== null && "message" in err
             ? String((err as { message: unknown }).message)
             : "Photo upload failed. Check your connection and try again.",
@@ -172,12 +159,9 @@ export function LoveNoteComposer({
         return;
       }
 
-      // Requirement 3.2: store the public Storage URL.
       imageUrl = uploadResult.data;
     }
-    // Requirement 3.4: no photo selected → imageUrl stays null.
 
-    // Step 2: Publish the note with the resolved imageUrl.
     const publishResult = await publishNote({
       content: content.trim(),
       loveType,
@@ -189,7 +173,7 @@ export function LoveNoteComposer({
 
     if ("error" in publishResult) {
       const err = publishResult.error;
-      setErrorMessage(
+      toast.error(
         typeof err === "object" && err !== null && "message" in err
           ? String((err as { message: unknown }).message)
           : "Failed to publish your LoveNote. Please try again.",
@@ -333,7 +317,7 @@ export function LoveNoteComposer({
       </label>
 
       {/* Photo preview */}
-      {photoPreview && !errorMessage && (
+      {photoPreview && (
         <div className="mt-3 relative w-20 h-20 rounded-md overflow-hidden border border-border">
           <img src={photoPreview} alt="Selected photo preview" className="object-cover w-full h-full" />
         </div>
@@ -343,17 +327,6 @@ export function LoveNoteComposer({
       {presetCoinId && (
         <p className="mt-3 text-xs text-muted-foreground">
           This LoveNote will be linked to LoveCoin #{presetCoinId}.
-        </p>
-      )}
-
-      {/* Error message (Requirement 18.2, 3.3) */}
-      {errorMessage && (
-        <p
-          className="mt-4 rounded-xl bg-destructive/10 px-4 py-3 text-sm text-destructive"
-          role="alert"
-          aria-live="assertive"
-        >
-          {errorMessage}
         </p>
       )}
 
