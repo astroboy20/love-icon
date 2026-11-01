@@ -4,6 +4,7 @@ import { LoveNoteCard } from "@/components/LoveNoteCard";
 import { LoveNoteComposer } from "@/features/fame/components/LoveNoteComposer";
 import { useGetNotesQuery } from "@/features/fame/api/fameApi";
 import type { LoveNote } from "@/features/fame/api/fameApi";
+import { useRealtimeSync } from "@/hooks/useRealtimeSync";
 import { dayGroupLabel } from "@/lib/format";
 import type { LoveType } from "@/lib/types";
 
@@ -26,6 +27,12 @@ export const Route = createFileRoute("/love-of-fame")({
 function LoveOfFame() {
   const { data: notes = [] } = useGetNotesQuery();
   const [composer, setComposer] = useState<LoveType | null>(null);
+
+  // Subscribe to reactions real-time events while this page is mounted.
+  // The root layout already handles lovecoins + lovenotes channels; this adds
+  // the reactions channel which is only needed when LoveNotes are visible.
+  // Requirement 9.5
+  useRealtimeSync({ subscribeToReactions: true });
 
   const groups = useMemo(() => {
     const sorted = [...notes].sort(

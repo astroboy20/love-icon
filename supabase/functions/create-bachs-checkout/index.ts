@@ -157,8 +157,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
   });
 
   const { data: order, error: orderError } = await adminClient
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    .from("purchase_orders" as any)
+    .from("purchase_orders")
     .select("id, user_id, payment_reference, coin_numbers, total_amount_kobo, status, bachs_checkout_id")
     .eq("id", orderId)
     .maybeSingle();
@@ -279,8 +278,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
   // ------------------------------------------------------------------
 
   const { error: updateError } = await adminClient
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    .from("purchase_orders" as any)
+    .from("purchase_orders")
     .update({ bachs_checkout_id: bachsResponse.id })
     .eq("id", orderId);
 

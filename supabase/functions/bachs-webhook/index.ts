@@ -52,24 +52,6 @@ interface PurchaseOrder {
   status: string;
 }
 
-interface CoinInsertPayload {
-  coin_number: number;
-  owner_id: string;
-  // Required fields in the lovecoins table; set to defaults at claim time.
-  // The user personalises via the ClaimFlow before payment; the personalization
-  // data lives in the purchase_order metadata in a full implementation.
-  // For the initial two-phase flow these are placeholder defaults — the
-  // personalization fields will be added to the purchase_order metadata in a
-  // future iteration (see design doc §Coin Personalization).
-  creator_name: string;
-  recipient_name: string;
-  relation: string;
-  message: string;
-  style: string;
-  visibility: string;
-  status: string;
-}
-
 // ---------------------------------------------------------------------------
 // Environment helpers
 // ---------------------------------------------------------------------------
@@ -225,10 +207,15 @@ async function refundConflictingCoins(
 // ---------------------------------------------------------------------------
 // Handle collection.succeeded
 //
-// Atomically inserts LoveCoin records for each coin number in the order.
-// Coin number conflicts (another user claimed first) are handled by:
-//   1. Skipping the conflicting coin_number.
-//   2. Issuing a Bachs refund for the conflicting spot(s).
+// Calls the `claim_coins_atomic` Postgres function via supabase.rpc() so that
+// coin inserts and the order status update happen in a single database
+// transaction. If the server crashes mid-way, Postgres rolls everything back —
+// no partial-fulfillment state is possible.
+//
+// Coin number conflicts (another user claimed first) are returned by the RPC
+// in the `conflicting` array. The Edge Function issues Bachs refunds for those
+// spots AFTER the transaction commits (refunds are an external side-effect and
+// must not block or be rolled back with the transaction).
 //
 // Requirements: 5.3, 5.8, 12.4, 12.9, 13.2, 13.4, 21.5, 21.7, 21.8
 // ---------------------------------------------------------------------------
@@ -251,83 +238,67 @@ async function handleCollectionSucceeded(
       console.error(
         `[bachs-webhook] Email mismatch — order user ${order.user_id} email "${authUser.user.email}" does not match checkout email "${customerEmail}"`,
       );
-      // Mark order as failed to prevent further processing
+      // Mark order as failed — non-atomic update is acceptable here because we
+      // are explicitly rejecting the order, not partially fulfilling it.
       await adminClient
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        .from("purchase_orders" as any)
+        .from("purchase_orders")
         .update({ status: "failed" })
         .eq("id", order.id);
       return jsonResponse({ error: "Email mismatch — order rejected" }, 200);
     }
   }
 
-  // Attempt to insert coins one by one, collecting conflicts
-  const conflictingNumbers: number[] = [];
-  const insertedNumbers: number[] = [];
+  // Build the coin payload array for the RPC.
+  // Personalization data (creator_name, message, style etc.) would come from
+  // purchase_order metadata in a full implementation. For now, safe defaults
+  // are used so the claim is recorded — users can personalise via the ClaimFlow
+  // before checkout in the next iteration (see design doc §Coin Personalization).
+  const coinPayloads = order.coin_numbers.map((coinNumber: number) => ({
+    coin_number: coinNumber,
+    owner_id: order.user_id,
+    creator_name: "LoveCoin User",
+    recipient_name: "LoveCoin User",
+    relation: "friend",
+    message: "",
+    style: "classic",
+    visibility: "public",
+    status: "claimed",
+  }));
 
-  for (const coinNumber of order.coin_numbers) {
-    // All required fields must be provided. Personalization data (name, message,
-    // style etc.) would be stored in the purchase_order metadata in a full
-    // implementation; here we use safe defaults so the claim is recorded.
-    const insertPayload: CoinInsertPayload = {
-      coin_number: coinNumber,
-      owner_id: order.user_id,
-      creator_name: "LoveCoin User",
-      recipient_name: "LoveCoin User",
-      relation: "friend",
-      message: "",
-      style: "default",
-      visibility: "public",
-      status: "claimed",
-    };
-
-    // Use `any` cast because purchase_orders is not yet in generated types (task 13).
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { error: insertError } = await (adminClient.from("lovecoins") as any)
-      .insert(insertPayload);
-
-    if (insertError) {
-      // PostgreSQL unique-constraint violation code
-      if (insertError.code === "23505") {
-        console.warn(
-          `[bachs-webhook] Coin ${coinNumber} already claimed — marking for refund`,
-        );
-        conflictingNumbers.push(coinNumber);
-      } else {
-        // Unexpected error — log and continue (best-effort; don't block the rest)
-        console.error(
-          `[bachs-webhook] Unexpected error inserting coin ${coinNumber}:`,
-          insertError,
-        );
-      }
-    } else {
-      insertedNumbers.push(coinNumber);
-    }
-  }
-
-  // Update purchase order to "succeeded" with the Bachs charge ID
-  const { error: updateError } = await adminClient
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    .from("purchase_orders" as any)
-    .update({
-      status: "succeeded",
-      bachs_charge_id: chargeId,
-    })
-    .eq("id", order.id);
-
-  if (updateError) {
-    console.error(
-      `[bachs-webhook] Failed to update order ${order.id} to succeeded:`,
-      updateError,
-    );
-    // Still return 200 — coins may have been inserted; Bachs should not retry
-  }
-
-  console.log(
-    `[bachs-webhook] Order ${order.id} succeeded. Inserted: [${insertedNumbers}], Conflicting: [${conflictingNumbers}]`,
+  // Call the atomic Postgres function (migration 0004).
+  // Coin inserts + order status update happen in a single transaction.
+  // Requirements: 21.7 (atomic transaction)
+  const { data: rpcResult, error: rpcError } = await adminClient.rpc(
+    "claim_coins_atomic",
+    {
+      p_order_id: order.id,
+      p_charge_id: chargeId,
+      p_coin_payloads: coinPayloads,
+    },
   );
 
-  // Issue refund for conflicting coin spots (Req 13.4)
+  if (rpcError) {
+    console.error(
+      `[bachs-webhook] claim_coins_atomic RPC failed for order ${order.id}:`,
+      rpcError,
+    );
+    // Return 200 so Bachs does not keep retrying a persistently failing order.
+    // The order stays in "pending" — a manual review will be needed.
+    return jsonResponse({ received: true }, 200);
+  }
+
+  const result = rpcResult as { inserted: number[]; conflicting: number[] };
+  const insertedNumbers: number[] = result?.inserted ?? [];
+  const conflictingNumbers: number[] = result?.conflicting ?? [];
+
+  console.log(
+    `[bachs-webhook] Order ${order.id} succeeded (atomic). Inserted: [${insertedNumbers}], Conflicting: [${conflictingNumbers}]`,
+  );
+
+  // Issue refunds for conflicting coin spots AFTER the transaction commits.
+  // Refunds are an external side-effect — they must not be rolled back if the
+  // Bachs API call fails; the refund attempt is best-effort with logging.
+  // Requirement 13.4
   if (conflictingNumbers.length > 0 && chargeId) {
     await refundConflictingCoins(
       bachsApiKey,
@@ -354,8 +325,7 @@ async function handleCollectionFailed(
   order: PurchaseOrder,
 ): Promise<Response> {
   const { error } = await adminClient
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    .from("purchase_orders" as any)
+    .from("purchase_orders")
     .update({ status: "failed" })
     .eq("id", order.id);
 
@@ -448,8 +418,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
   // ------------------------------------------------------------------
 
   const { data: orderData, error: orderError } = await adminClient
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    .from("purchase_orders" as any)
+    .from("purchase_orders")
     .select("id, user_id, payment_reference, coin_numbers, total_amount_kobo, status")
     .eq("payment_reference", paymentReference)
     .maybeSingle();

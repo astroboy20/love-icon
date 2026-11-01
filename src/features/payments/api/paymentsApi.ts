@@ -19,6 +19,7 @@ import { createApi } from "@reduxjs/toolkit/query/react";
 import { supabase } from "@/integrations/supabase/client";
 import { supabaseBaseQuery, interceptSupabaseError } from "@/lib/api/supabaseBaseQuery";
 import { EDGE_FUNCTIONS } from "@/lib/config/app";
+import type { Tables } from "@/integrations/supabase/types";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -26,18 +27,12 @@ import { EDGE_FUNCTIONS } from "@/lib/config/app";
 
 export type PurchaseOrderStatus = "pending" | "succeeded" | "failed" | "cancelled";
 
-export interface PurchaseOrder {
-  id: string;
-  user_id: string;
-  payment_reference: string;
-  coin_numbers: number[];
-  total_amount_kobo: number;
+// Derive from the generated DB type so it stays in sync with the schema.
+// Override `status` to the narrower union — the DB type uses `string` to allow
+// service-role writes; the client only ever sees the four known values.
+export type PurchaseOrder = Omit<Tables<"purchase_orders">, "status"> & {
   status: PurchaseOrderStatus;
-  bachs_checkout_id: string | null;
-  bachs_charge_id: string | null;
-  created_at: string;
-  updated_at: string;
-}
+};
 
 interface CreatePurchaseOrderArgs {
   coinNumbers: number[];
@@ -82,11 +77,8 @@ export const paymentsApi = createApi({
           };
         }
 
-        // purchase_orders table is created in migration 0001.
-        // Using `any` cast because the type is not yet in the generated types file;
-        // it will be added in task 13 (TypeScript type regen).
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const { data, error } = await (supabase.from("purchase_orders" as any) as any)
+        const { data, error } = await supabase
+          .from("purchase_orders")
           .insert({
             user_id: user.id,
             payment_reference: paymentReference,
@@ -133,8 +125,8 @@ export const paymentsApi = createApi({
     // ------------------------------------------------------------------
     getOrderStatus: build.query<PurchaseOrder | null, string>({
       queryFn: async (orderId, { dispatch }) => {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const { data, error } = await (supabase.from("purchase_orders" as any) as any)
+        const { data, error } = await supabase
+          .from("purchase_orders")
           .select("*")
           .eq("id", orderId)
           .maybeSingle();
@@ -152,8 +144,8 @@ export const paymentsApi = createApi({
     // ------------------------------------------------------------------
     cancelPurchaseOrder: build.mutation<void, string>({
       queryFn: async (orderId, { dispatch }) => {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const { error } = await (supabase.from("purchase_orders" as any) as any)
+        const { error } = await supabase
+          .from("purchase_orders")
           .update({ status: "cancelled" })
           .eq("id", orderId);
 
